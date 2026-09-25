@@ -1,0 +1,105 @@
+@model MarketLink.Dtos.RegisterDto
+@{
+    ViewData["Title"] = "Register";
+    Layout = "_Layout";
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+        <div class="card auth-card shadow-sm mt-4">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-1">Create a customer account</h1>
+                <p class="text-muted mb-4">Sign up to pre-order from markets near you.</p>
+
+                <form asp-action="Register" method="post" novalidate>
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label asp-for="FullName" class="form-label"></label>
+                            <input asp-for="FullName" class="form-control" autocomplete="name" placeholder="Nguyen Thi Lan" />
+                            <span asp-validation-for="FullName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" autocomplete="email" placeholder="lan@gmail.com" />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Phone" class="form-label"></label>
+                            <input asp-for="Phone" class="form-control" autocomplete="tel" inputmode="numeric" placeholder="0901234567" />
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Password" class="form-label"></label>
+                            <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="ConfirmPassword" class="form-label"></label>
+                            <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="CityId" class="form-label"></label>
+                            <select asp-for="CityId" asp-items="ViewBag.Cities" class="form-select">
+                                <option value="">-- Select a city --</option>
+                            </select>
+                            <span asp-validation-for="CityId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="DistrictId" class="form-label"></label>
+                            <select asp-for="DistrictId" asp-items="ViewBag.Districts" class="form-select">
+                                <option value="">-- Select a district --</option>
+                            </select>
+                            <span asp-validation-for="DistrictId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <label asp-for="Address" class="form-label"></label>
+                            <input asp-for="Address" class="form-control" autocomplete="street-address" placeholder="House number, street, ward" />
+                            <span asp-validation-for="Address" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 mt-4">Sign up</button>
+                </form>
+
+                <hr class="my-4" />
+
+                <p class="text-center mb-0">
+                    Already have an account?
+                    <a asp-action="Login">Log in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        // When the city changes, reload the districts of that city
+        $("#CityId").on("change", function () {
+            var cityId = $(this).val();
+            var districtSelect = $("#DistrictId");
+
+            districtSelect.empty().append('<option value="">-- Select a district --</option>');
+
+            if (!cityId) return;
+
+            $.getJSON("@Url.Action("GetDistricts", "Account")", { cityId: cityId }, function (districts) {
+                $.each(districts, function (i, d) {
+                    districtSelect.append($("<option>").val(d.districtId).text(d.districtName));
+                });
+            });
+        });
+    </script>
+}
