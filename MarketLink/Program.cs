@@ -1,4 +1,5 @@
 using MarketLink.Data;
+using MarketLink.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,9 @@ builder.Services.AddControllersWithViews();
 
 builder.Services.AddDbContext<MarketLinkDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MarketConnection")));
+
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICustomerAccountService, CustomerAccountService>();
 
 // Cookie-based login
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

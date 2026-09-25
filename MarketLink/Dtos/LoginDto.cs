@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MarketLink.Dtos
 {
-    // Login form data
+    
     public class LoginDto
     {
         [Required(ErrorMessage = "Please enter your email or phone number")]
