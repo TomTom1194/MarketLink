@@ -1,7 +1,10 @@
 @{
     // Highlight the menu item of the current page
     string current = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
-    string Active(string controller) => current == controller ? "active" : "";
+    string Active(string controller) => current == controller ? "on" : "";
+
+    string displayName = User.Identity?.Name ?? "";
+    string initial = displayName.Length > 0 ? displayName.Substring(0, 1).ToUpper() : "?";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -9,63 +12,107 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - MarketLink Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
 <body class="admin-body">
-<div class="admin-shell">
-    <aside class="admin-sidebar">
-        <a class="admin-brand" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
-            MarketLink <span>Admin</span>
+
+@* ===== Green top bar, same as the shop header ===== *@
+<header class="admin-header">
+    <div class="admin-wrap admin-header-row">
+        <a class="admin-logo" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16l-1.6 7.4A2 2 0 0 1 16.4 20H7.6a2 2 0 0 1-2-1.6z"></path><path d="M8.5 11 11 6.5"></path><path d="M13 8.5c.5-3 3-4.5 6-4.5 0 3-2.5 5-6 4.5z" fill="#FFD400" stroke="#FFD400"></path></svg>
+            <span>MarketLink</span>
+            <span class="admin-badge">Admin</span>
         </a>
 
-        <nav class="admin-nav">
-            <a class="@Active("Dashboard")" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+        <div class="admin-header-right">
+            <a class="admin-head-link" asp-area="" asp-controller="Home" asp-action="Index">View site</a>
+        </div>
+    </div>
+</header>
 
-            <div class="admin-nav-label">Operations</div>
-            <a class="@Active("Markets")" asp-area="Admin" asp-controller="Markets" asp-action="Index">Markets</a>
-            <a class="@Active("Farmers")" asp-area="Admin" asp-controller="Farmers" asp-action="Index">Farmers</a>
-            <a class="@Active("Customers")" asp-area="Admin" asp-controller="Customers" asp-action="Index">Customers</a>
+<div class="admin-wrap admin-page">
+    <div class="admin-layout">
 
-            <div class="admin-nav-label">Settings</div>
-            <a class="@Active("Categories")" asp-area="Admin" asp-controller="Categories" asp-action="Index">Product categories</a>
-            <a class="@Active("ProductExps")" asp-area="Admin" asp-controller="ProductExps" asp-action="Index">Display periods</a>
-
-            <div class="admin-nav-label">Insights</div>
-            <a class="@Active("Reports")" asp-area="Admin" asp-controller="Reports" asp-action="Index">Reports</a>
-        </nav>
-    </aside>
-
-    <div class="admin-main">
-        <header class="admin-topbar">
-            <h1 class="admin-title">@ViewData["Title"]</h1>
+        @* ===== Left menu, same look as the customer account menu ===== *@
+        <aside class="admin-side">
             <div class="admin-user">
-                <span class="text-muted small">@User.Identity?.Name</span>
-                <a class="btn btn-sm btn-outline-secondary" asp-area="" asp-controller="Home" asp-action="Index">View site</a>
-                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Log out</button>
-                </form>
+                <span class="admin-avatar">@initial</span>
+                <span class="admin-user-text">
+                    <span class="admin-user-name">@displayName</span>
+                    <span class="admin-muted">Administrator</span>
+                </span>
             </div>
-        </header>
 
-        <main class="admin-content">
+            <nav class="admin-nav" aria-label="Admin">
+                <a class="@Active("Dashboard")" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>
+                    <span>Dashboard</span>
+                </a>
+
+                <div class="admin-nav-label">Operations</div>
+                <a class="@Active("Markets")" asp-area="Admin" asp-controller="Markets" asp-action="Index">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-5h15L21 9"></path><path d="M3 9h18v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"></path><path d="M5 13v8h14v-8"></path></svg>
+                    <span>Markets</span>
+                </a>
+                <a class="@Active("Farmers")" asp-area="Admin" asp-controller="Farmers" asp-action="Index">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4-3-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-3 8-7 11z"></path><path d="M12 14V8"></path><path d="M12 11c-1.5 0-3-1-3-3 2 0 3 1 3 3zM12 10c1.5 0 3-1 3-3-2 0-3 1-3 3z"></path></svg>
+                    <span>Farmers</span>
+                </a>
+                <a class="@Active("Customers")" asp-area="Admin" asp-controller="Customers" asp-action="Index">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.5 3.5-5.5 6.5-5.5s5.7 2 6.5 5.5"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c1.8.7 3 2.6 3.5 5.5"></path></svg>
+                    <span>Customers</span>
+                </a>
+
+                <div class="admin-nav-label">Settings</div>
+                <a class="@Active("Categories")" asp-area="Admin" asp-controller="Categories" asp-action="Index">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"></path><circle cx="7.5" cy="7.5" r="1.5"></circle></svg>
+                    <span>Product categories</span>
+                </a>
+                <a class="@Active("ProductExps")" asp-area="Admin" asp-controller="ProductExps" asp-action="Index">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+                    <span>Display periods</span>
+                </a>
+
+                <div class="admin-nav-label">Insights</div>
+                <a class="@Active("Reports")" asp-area="Admin" asp-controller="Reports" asp-action="Index">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg>
+                    <span>Reports</span>
+                </a>
+
+                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" class="admin-logout">
+                    <button type="submit">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"></path><path d="M10 16l-4-4 4-4"></path><path d="M6 12h10"></path></svg>
+                        <span>Log out</span>
+                    </button>
+                </form>
+            </nav>
+        </aside>
+
+        @* ===== Page content ===== *@
+        <main class="admin-main">
+            <h1 class="admin-title">@ViewData["Title"]</h1>
+
             @if (TempData["Success"] != null)
             {
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <div class="admin-alert ok alert-dismissible fade show" role="alert">
                     @TempData["Success"]
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             }
             @if (TempData["Warning"] != null)
             {
-                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <div class="admin-alert warn alert-dismissible fade show" role="alert">
                     @TempData["Warning"]
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             }
             @if (TempData["Error"] != null)
             {
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <div class="admin-alert err alert-dismissible fade show" role="alert">
                     @TempData["Error"]
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>

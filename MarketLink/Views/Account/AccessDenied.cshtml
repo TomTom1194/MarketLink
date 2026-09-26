@@ -1,16 +1,11 @@
 @{
     ViewData["Title"] = "Access denied";
-    Layout = "_Layout";
 }
 
-<div class="row justify-content-center">
-    <div class="col-12 col-md-8 col-lg-6">
-        <div class="card auth-card shadow-sm mt-4">
-            <div class="card-body p-4 text-center">
-                <h1 class="h4">You don't have access to this page</h1>
-                <p class="text-muted">This page is for a different role. Please log in with the right account.</p>
-                <a asp-controller="Home" asp-action="Index" class="btn btn-outline-success">Back to home</a>
-            </div>
-        </div>
+<div class="auth-box card-box" style="text-align:center;max-width:560px">
+    <h1 class="title">You don't have access to this page</h1>
+    <p class="muted" style="margin:0">This page is for a different role. Please log in with the right account.</p>
+    <div>
+        <a asp-controller="Home" asp-action="Index" class="btn-ml outline">Back to home</a>
     </div>
 </div>

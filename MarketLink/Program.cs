@@ -68,7 +68,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
-app.UseAuthentication();   // must come before UseAuthorization
+app.UseAuthentication();   
 app.UseAuthorization();
 
 app.MapStaticAssets();

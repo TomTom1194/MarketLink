@@ -20,9 +20,10 @@ namespace MarketLink.Controllers
         [HttpGet]
         public async Task<IActionResult> Index()
         {
+            // Already logged in: the Login page sends them to the portal of their role
             if (User.Identity != null && User.Identity.IsAuthenticated)
             {
-                return RedirectToAction("Index", "Home");
+                return RedirectToAction("Login", "Account");
             }
 
             var model = new FarmerApplicationDto
