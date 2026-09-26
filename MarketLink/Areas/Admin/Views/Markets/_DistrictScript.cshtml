@@ -1,0 +1,17 @@
+@* When the city changes, reload the districts of that city *@
+<script>
+    $("#CityId").on("change", function () {
+        var cityId = $(this).val();
+        var districtSelect = $("#DistrictId");
+
+        districtSelect.empty().append('<option value="">-- Select a district --</option>');
+
+        if (!cityId) return;
+
+        $.getJSON("@Url.Action("Districts", "Markets", new { area = "Admin" })", { cityId: cityId }, function (districts) {
+            $.each(districts, function (i, d) {
+                districtSelect.append($("<option>").val(d.districtId).text(d.districtName));
+            });
+        });
+    });
+</script>

@@ -1,0 +1,181 @@
+@model FarmerApplicationDetailDto
+@{
+    ViewData["Title"] = "Farmer application";
+    Layout = "_AdminLayout";
+
+    string status = Model.ApprovalStatus;
+    bool hasNewMarket = Model.Stalls.Any(s => s.MarketIsNew);
+}
+
+<div class="toolbar">
+    <a asp-action="Index" asp-route-status="@status" class="text-decoration-none">← All farmers</a>
+</div>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+    <h2 class="h4 m-0">@Model.BrandName</h2>
+    <span class="status-pill status-@status">@status</span>
+</div>
+
+<div class="row g-4">
+    @* ===== Left: application details ===== *@
+    <div class="col-lg-8 d-flex flex-column gap-4">
+
+        <div class="admin-card">
+            <h3 class="h6 text-uppercase text-muted mb-3">Applicant</h3>
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Farm / brand</dt>
+                <dd class="col-sm-8">@Model.BrandName</dd>
+
+                <dt class="col-sm-4">Contact person</dt>
+                <dd class="col-sm-8">@Model.ContactPerson</dd>
+
+                <dt class="col-sm-4">Email</dt>
+                <dd class="col-sm-8">@Model.Email</dd>
+
+                <dt class="col-sm-4">Phone</dt>
+                <dd class="col-sm-8">@Model.Phone</dd>
+
+                <dt class="col-sm-4">Address</dt>
+                <dd class="col-sm-8">@Model.Address, @Model.DistrictName, @Model.CityName</dd>
+
+                <dt class="col-sm-4">What they grow or sell</dt>
+                <dd class="col-sm-8">
+                    @if (string.IsNullOrEmpty(Model.Description))
+                    {
+                        <span class="text-muted">Not given</span>
+                    }
+                    else
+                    {
+                        <text>@Model.Description</text>
+                    }
+                </dd>
+
+                <dt class="col-sm-4">Applied on</dt>
+                <dd class="col-sm-8 mb-0">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</dd>
+            </dl>
+        </div>
+
+        @foreach (var stall in Model.Stalls)
+        {
+            <div class="admin-card">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <h3 class="h6 text-uppercase text-muted m-0">Market &amp; stall</h3>
+                    @if (stall.MarketIsNew)
+                    {
+                        <span class="status-pill status-pending">New market suggested by this farmer</span>
+                    }
+                </div>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Market</dt>
+                    <dd class="col-sm-8">
+                        @stall.MarketName<br />
+                        <span class="small text-muted">@stall.MarketDistrictName, @stall.MarketCityName</span>
+                    </dd>
+
+                    <dt class="col-sm-4">Market days</dt>
+                    <dd class="col-sm-8">
+                        @MarketDays.ToDisplay(stall.MarketOpenDays),
+                        @(stall.MarketOpenTime.ToString("hh\\:mm"))–@(stall.MarketCloseTime.ToString("hh\\:mm"))
+                    </dd>
+
+                    <dt class="col-sm-4">Market map</dt>
+                    <dd class="col-sm-8">
+                        <a href="@stall.MarketMapUrl" target="_blank" rel="noopener">Open in Google Maps</a>
+                    </dd>
+
+                    <dt class="col-sm-4">Stall code</dt>
+                    <dd class="col-sm-8"><strong>@stall.StallCode</strong></dd>
+
+                    <dt class="col-sm-4">Sells on</dt>
+                    <dd class="col-sm-8">@MarketDays.ToDisplay(stall.SellingDays)</dd>
+
+                    <dt class="col-sm-4">How to find the stall</dt>
+                    <dd class="col-sm-8">
+                        @if (string.IsNullOrEmpty(stall.LocationNote))
+                        {
+                            <span class="text-muted">Not given</span>
+                        }
+                        else
+                        {
+                            <text>@stall.LocationNote</text>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-4">Stall map</dt>
+                    <dd class="col-sm-8 mb-0">
+                        @if (string.IsNullOrEmpty(stall.GoogleUrl))
+                        {
+                            <span class="text-muted">Not given</span>
+                        }
+                        else
+                        {
+                            <a href="@stall.GoogleUrl" target="_blank" rel="noopener">Open in Google Maps</a>
+                        }
+                    </dd>
+                </dl>
+            </div>
+        }
+
+        @if (Model.Stalls.Count == 0)
+        {
+            <div class="admin-card text-muted">This farmer has no stall yet.</div>
+        }
+    </div>
+
+    @* ===== Right: review panel ===== *@
+    <div class="col-lg-4">
+        <div class="admin-card">
+            <h3 class="h6 text-uppercase text-muted mb-3">Review</h3>
+
+            @if (status == "pending")
+            {
+                <p class="small text-muted">
+                    Approving creates a password and emails the login link to <strong>@Model.Email</strong>.
+                    @if (hasNewMarket)
+                    {
+                        <span>The new market they suggested will also be shown to customers.</span>
+                    }
+                </p>
+                <div class="d-grid gap-2">
+                    <form asp-action="Approve" asp-route-id="@Model.FarmerId" method="post"
+                          onsubmit="return confirm('Approve this farmer and email their login details?');">
+                        <button type="submit" class="btn btn-success w-100">Approve</button>
+                    </form>
+                    <form asp-action="Reject" asp-route-id="@Model.FarmerId" method="post"
+                          onsubmit="return confirm('Reject this application? The farmer will be told by email.');">
+                        <button type="submit" class="btn btn-outline-danger w-100">Reject</button>
+                    </form>
+                </div>
+            }
+            else if (status == "approved")
+            {
+                <p class="small mb-1">Approved on <strong>@(Model.ApprovedAt?.ToString("dd/MM/yyyy HH:mm"))</strong></p>
+                @if (!string.IsNullOrEmpty(Model.ApprovedByEmail))
+                {
+                    <p class="small text-muted">by @Model.ApprovedByEmail</p>
+                }
+                <p class="small text-muted">@Model.ProductCount product(s) posted.</p>
+                <form asp-action="Suspend" asp-route-id="@Model.FarmerId" method="post"
+                      onsubmit="return confirm('Suspend this farmer? They will not be able to sell.');">
+                    <button type="submit" class="btn btn-outline-danger w-100">Suspend</button>
+                </form>
+            }
+            else if (status == "rejected")
+            {
+                <p class="small text-muted">This application was rejected. You can still approve it; a new password will be emailed.</p>
+                <form asp-action="Approve" asp-route-id="@Model.FarmerId" method="post"
+                      onsubmit="return confirm('Approve this farmer and email their login details?');">
+                    <button type="submit" class="btn btn-success w-100">Approve</button>
+                </form>
+            }
+            else if (status == "suspended")
+            {
+                <p class="small text-muted">This farmer is suspended and cannot sell. Reactivating keeps their current password.</p>
+                <form asp-action="Approve" asp-route-id="@Model.FarmerId" method="post">
+                    <button type="submit" class="btn btn-outline-success w-100">Reactivate</button>
+                </form>
+            }
+        </div>
+    </div>
+</div>

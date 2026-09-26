@@ -1,0 +1,95 @@
+@model List<CustomerRowDto>
+@{
+    ViewData["Title"] = "Customers";
+    Layout = "_AdminLayout";
+
+    string? status = ViewBag.Status;
+    string? search = ViewBag.Search;
+
+    var tabs = new List<(string? Value, string Label)>
+    {
+        (null, "All"),
+        ("active", "Active"),
+        ("disabled", "Locked")
+    };
+}
+
+<div class="toolbar">
+    <ul class="nav nav-pills">
+        @foreach (var tab in tabs)
+        {
+            <li class="nav-item">
+                <a class="nav-link @(status == tab.Value ? "active" : "")"
+                   asp-action="Index" asp-route-status="@tab.Value" asp-route-search="@search">@tab.Label</a>
+            </li>
+        }
+    </ul>
+
+    <form method="get" asp-action="Index">
+        <input type="hidden" name="status" value="@status" />
+        <input type="search" name="search" value="@search" class="form-control" placeholder="Search name, email, phone" />
+        <button type="submit" class="btn btn-outline-secondary">Search</button>
+    </form>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="admin-card text-muted">No customers in this list.</div>
+}
+else
+{
+    <div class="admin-table">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Customer</th>
+                <th>Contact</th>
+                <th>Area</th>
+                <th>Joined</th>
+                <th class="num">Orders</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var customer in Model)
+            {
+                <tr>
+                    <td class="fw-semibold">@customer.FullName</td>
+                    <td>
+                        @customer.Phone<br />
+                        <span class="small text-muted">@customer.Email</span>
+                    </td>
+                    <td>@customer.DistrictName, @customer.CityName</td>
+                    <td class="text-nowrap">@customer.CreatedAt.ToString("dd/MM/yyyy")</td>
+                    <td class="num">@customer.OrderCount</td>
+                    <td>
+                        <span class="status-pill status-@customer.Status">
+                            @(customer.Status == "active" ? "Active" : "Locked")
+                        </span>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            @if (customer.Status == "active")
+                            {
+                                <form asp-action="Lock" asp-route-id="@customer.UserId" method="post"
+                                      onsubmit="return confirm('Lock this account? The customer will not be able to log in.');">
+                                    <input type="hidden" name="returnStatus" value="@status" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Lock</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-action="Unlock" asp-route-id="@customer.UserId" method="post">
+                                    <input type="hidden" name="returnStatus" value="@status" />
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Unlock</button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,65 @@
+@model List<ProductExp>
+@{
+    ViewData["Title"] = "Display periods";
+    Layout = "_AdminLayout";
+
+    var productCounts = (Dictionary<int, int>)ViewBag.ProductCounts;
+}
+
+<div class="toolbar">
+    <p class="text-muted m-0">
+        How long a product stays on the website after the farmer posts or reposts it.
+        Changing the days only affects products posted after the change.
+    </p>
+    <a class="btn btn-success" asp-action="Create">+ New period</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="admin-card">
+        <p class="mb-1 fw-semibold">No display periods yet.</p>
+        <p class="text-muted mb-0">Farmers cannot post products until at least one exists. Add e.g. SHORT (3 days) and LONG (30 days).</p>
+    </div>
+}
+else
+{
+    <div class="admin-table">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th class="num">Days shown</th>
+                <th>Description</th>
+                <th class="num">Products</th>
+                <th class="text-end">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var exp in Model)
+            {
+                int used = productCounts.GetValueOrDefault(exp.ExpId);
+                <tr>
+                    <td><code>@exp.ExpCode</code></td>
+                    <td class="fw-semibold">@exp.ExpName</td>
+                    <td class="num">@exp.DurationDays</td>
+                    <td class="text-muted">@exp.Description</td>
+                    <td class="num">@used</td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@exp.ExpId">Edit</a>
+                            @if (used == 0)
+                            {
+                                <form asp-action="Delete" asp-route-id="@exp.ExpId" method="post"
+                                      onsubmit="return confirm('Delete this display period?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

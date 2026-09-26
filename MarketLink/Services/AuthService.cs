@@ -56,9 +56,14 @@ namespace MarketLink.Services
                 Role = role,
                 Email = NormalizeEmail(email),
                 Phone = NormalizePhone(phone),
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                PasswordHash = HashPassword(password),
                 Status = "active"
             };
+        }
+
+        public string HashPassword(string password)
+        {
+            return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
         // Returns the user when the email/phone and password are correct, otherwise null.

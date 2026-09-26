@@ -17,3 +17,6 @@ obj/
 
 # Logs
 *.log
+
+# Files uploaded through the website
+MarketLink/wwwroot/uploads/

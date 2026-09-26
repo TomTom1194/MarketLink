@@ -1,9 +1,16 @@
 using MarketLink.Data;
+using System.Globalization;
 using MarketLink.Services;
+using MarketLink.Services.Admin;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Use English (US) number and date formats everywhere, e.g. 10.762622 and 95,000
+var culture = new CultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentCulture = culture;
+CultureInfo.DefaultThreadCurrentUICulture = culture;
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -14,6 +21,19 @@ builder.Services.AddDbContext<MarketLinkDbContext>(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICustomerAccountService, CustomerAccountService>();
+builder.Services.AddScoped<IFarmerAccountService, FarmerAccountService>();
+
+// Email (settings in appsettings.json -> "EmailSettings")
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+// Admin portal
+builder.Services.AddScoped<IAdminReportService, AdminReportService>();
+builder.Services.AddScoped<IAdminMarketService, AdminMarketService>();
+builder.Services.AddScoped<IAdminFarmerService, AdminFarmerService>();
+builder.Services.AddScoped<IAdminCustomerService, AdminCustomerService>();
+builder.Services.AddScoped<IAdminCategoryService, AdminCategoryService>();
+builder.Services.AddScoped<IAdminProductExpService, AdminProductExpService>();
 
 // Cookie-based login
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -44,6 +64,12 @@ app.UseAuthentication();   // must come before UseAuthorization
 app.UseAuthorization();
 
 app.MapStaticAssets();
+
+// Admin area: /Admin, /Admin/Markets, /Admin/Farmers/Index?status=pending ...
+app.MapControllerRoute(
+        name: "areas",
+        pattern: "{area:exists}/{controller=Dashboard}/{action=Index}/{id?}")
+    .WithStaticAssets();
 
 app.MapControllerRoute(
         name: "default",
