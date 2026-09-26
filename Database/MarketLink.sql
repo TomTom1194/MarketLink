@@ -71,14 +71,13 @@ CREATE TABLE Markets (
     market_id    INT IDENTITY(1,1) PRIMARY KEY,
     district_id  INT NOT NULL REFERENCES Districts(district_id),
     market_name  NVARCHAR(150) NOT NULL,
-    address      NVARCHAR(255) NOT NULL,
-    latitude     DECIMAL(9,6) NULL,
-    longitude    DECIMAL(9,6) NULL,
-    map_url      NVARCHAR(500) NULL,
+    map_url      NVARCHAR(500) NOT NULL,             -- Google Maps link to the market
+    image_url    NVARCHAR(500) NULL,                 -- market photo, e.g. /uploads/markets/abc.jpg
     open_days    NVARCHAR(20) NOT NULL,              -- market days, e.g. '2,4,7'
     open_time    TIME NOT NULL,
     close_time   TIME NOT NULL,
     is_active    BIT NOT NULL DEFAULT 1,
+    requested_by INT NULL REFERENCES Users(user_id),  -- farmer who suggested this market (NULL = created by admin)
     CHECK (close_time > open_time)
 );
 
@@ -89,8 +88,7 @@ CREATE TABLE Stalls (
     farmer_id      INT NOT NULL REFERENCES Farmer_Profile(farmer_id),
     stall_code     NVARCHAR(20) NOT NULL,             -- e.g. B-12
     location_note  NVARCHAR(255) NULL,                -- e.g. Row B, next to gate 2
-    latitude       DECIMAL(9,6) NULL,
-    longitude      DECIMAL(9,6) NULL,
+    google_url     NVARCHAR(500) NULL,                -- Google Maps link to the stall
     selling_days   NVARCHAR(20) NOT NULL,             -- e.g. '4,7'
     is_active      BIT NOT NULL DEFAULT 1,
     UNIQUE (market_id, stall_code)

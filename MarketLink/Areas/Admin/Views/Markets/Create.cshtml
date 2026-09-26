@@ -1,0 +1,21 @@
+@model MarketFormDto
+@{
+    ViewData["Title"] = "New market";
+    Layout = "_AdminLayout";
+}
+
+<div class="admin-card form-card">
+    <form asp-action="Create" method="post" enctype="multipart/form-data" novalidate>
+        <partial name="_MarketForm" model="Model" />
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-success">Create market</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <partial name="_DistrictScript" />
+}

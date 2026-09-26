@@ -1,0 +1,85 @@
+@model DashboardDto
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "_AdminLayout";
+}
+
+<div class="stat-grid">
+    <div class="admin-card stat-card">
+        <div class="stat-label">Farmers</div>
+        <div class="stat-value">@Model.ApprovedFarmers</div>
+        <div class="stat-note">
+            @if (Model.PendingFarmers > 0)
+            {
+                <a asp-controller="Farmers" asp-action="Index" asp-route-status="pending">@Model.PendingFarmers waiting for approval</a>
+            }
+            else
+            {
+                <span>No applications waiting</span>
+            }
+        </div>
+    </div>
+
+    <div class="admin-card stat-card">
+        <div class="stat-label">Active customers</div>
+        <div class="stat-value">@Model.ActiveCustomers</div>
+        <div class="stat-note"><a asp-controller="Customers" asp-action="Index">Manage customers</a></div>
+    </div>
+
+    <div class="admin-card stat-card">
+        <div class="stat-label">Markets</div>
+        <div class="stat-value">@Model.ActiveMarkets</div>
+        <div class="stat-note">active of @Model.TotalMarkets total</div>
+    </div>
+
+    <div class="admin-card stat-card">
+        <div class="stat-label">Orders</div>
+        <div class="stat-value">@Model.TotalOrders</div>
+        <div class="stat-note">@Model.OrdersToday placed today</div>
+    </div>
+
+    <div class="admin-card stat-card">
+        <div class="stat-label">Revenue this month</div>
+        <div class="stat-value">@Model.RevenueThisMonth.ToString("N0")</div>
+        <div class="stat-note">VND, completed orders</div>
+    </div>
+</div>
+
+<div class="toolbar">
+    <h2 class="h5 m-0">Farmers waiting for approval</h2>
+    <a class="btn btn-sm btn-outline-success" asp-controller="Farmers" asp-action="Index" asp-route-status="pending">See all</a>
+</div>
+
+@if (Model.LatestPendingFarmers.Count == 0)
+{
+    <div class="admin-card text-muted">No farmer applications are waiting. New sign-ups will appear here.</div>
+}
+else
+{
+    <div class="admin-table">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Farm / brand</th>
+                <th>Contact</th>
+                <th>Area</th>
+                <th>Applied</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var farmer in Model.LatestPendingFarmers)
+            {
+                <tr>
+                    <td class="fw-semibold"><a asp-controller="Farmers" asp-action="Detail" asp-route-id="@farmer.FarmerId">@farmer.BrandName</a></td>
+                    <td>
+                        @farmer.ContactPerson<br />
+                        <span class="small text-muted">@farmer.Phone · @farmer.Email</span>
+                    </td>
+                    <td>@farmer.DistrictName, @farmer.CityName</td>
+                    <td class="text-nowrap">@farmer.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,272 @@
+@model MarketLink.Dtos.FarmerApplicationDto
+@using MarketLink.Dtos.Admin
+@{
+    ViewData["Title"] = "Sell on MarketLink";
+    Layout = "_Layout";
+
+    var markets = (List<Market>)ViewBag.Markets;
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+        <div class="card auth-card shadow-sm mt-4">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-1">Apply to sell on MarketLink</h1>
+                <p class="text-muted mb-4">
+                    Tell us about your farm and your stall. After our team approves your application,
+                    we email you a link and a password to log in.
+                </p>
+
+                <form asp-action="Index" method="post" novalidate>
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+
+                    @* ===== 1. About you ===== *@
+                    <h2 class="h5 mt-2 mb-3">1. About you</h2>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="BrandName" class="form-label"></label>
+                            <input asp-for="BrandName" class="form-control" placeholder="e.g. Co Ba Vegetable Garden" />
+                            <span asp-validation-for="BrandName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="ContactPerson" class="form-label"></label>
+                            <input asp-for="ContactPerson" class="form-control" autocomplete="name" placeholder="Nguyen Van Ba" />
+                            <span asp-validation-for="ContactPerson" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" autocomplete="email" placeholder="farm@gmail.com" />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Phone" class="form-label"></label>
+                            <input asp-for="Phone" class="form-control" autocomplete="tel" inputmode="numeric" placeholder="0901234567" />
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="CityId" class="form-label"></label>
+                            <select asp-for="CityId" asp-items="ViewBag.Cities" class="form-select">
+                                <option value="">-- Select a city --</option>
+                            </select>
+                            <span asp-validation-for="CityId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="DistrictId" class="form-label"></label>
+                            <select asp-for="DistrictId" asp-items="ViewBag.Districts" class="form-select">
+                                <option value="">-- Select a district --</option>
+                            </select>
+                            <span asp-validation-for="DistrictId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <label asp-for="Address" class="form-label"></label>
+                            <input asp-for="Address" class="form-control" placeholder="Street number, street, ward" />
+                            <span asp-validation-for="Address" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label"></label>
+                            <textarea asp-for="Description" class="form-control" rows="2"
+                                      placeholder="e.g. Leafy greens and herbs, grown without chemical pesticides"></textarea>
+                            <span asp-validation-for="Description" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    @* ===== 2. Where do you sell? ===== *@
+                    <h2 class="h5 mt-4 mb-3">2. Where do you sell?</h2>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label asp-for="MarketId" class="form-label"></label>
+                            <select asp-for="MarketId" class="form-select">
+                                <option value="">-- Choose your market --</option>
+                                @foreach (var city in markets.GroupBy(m => m.District!.City!.CityName))
+                                {
+                                    <optgroup label="@city.Key">
+                                        @foreach (var market in city)
+                                        {
+                                            <option value="@market.MarketId"
+                                                    data-days="@MarketDays.ToDisplay(market.OpenDays)"
+                                                    data-hours="@(market.OpenTime.ToString("hh\\:mm"))–@(market.CloseTime.ToString("hh\\:mm"))">
+                                                @market.MarketName — @(market.District!.DistrictName)
+                                            </option>
+                                        }
+                                    </optgroup>
+                                }
+                                <option value="@FarmerApplicationDto.OtherMarket">Other – my market is not listed</option>
+                            </select>
+                            <div id="market-hint" class="form-text"></div>
+                            <span asp-validation-for="MarketId" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    @* Shown only when "Other" is chosen *@
+                    <div id="new-market" class="border rounded p-3 mt-3 @(Model.IsNewMarket ? "" : "d-none")">
+                        <p class="small text-muted mb-3">
+                            Tell us about your market. It will appear on MarketLink after our team approves your application.
+                        </p>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label asp-for="NewMarketName" class="form-label"></label>
+                                <input asp-for="NewMarketName" class="form-control" placeholder="e.g. Tan My Market" />
+                                <span asp-validation-for="NewMarketName" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="NewMarketCityId" class="form-label"></label>
+                                <select asp-for="NewMarketCityId" asp-items="ViewBag.MarketCities" class="form-select">
+                                    <option value="">-- Select a city --</option>
+                                </select>
+                                <span asp-validation-for="NewMarketCityId" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="NewMarketDistrictId" class="form-label"></label>
+                                <select asp-for="NewMarketDistrictId" asp-items="ViewBag.MarketDistricts" class="form-select">
+                                    <option value="">-- Select a district --</option>
+                                </select>
+                                <span asp-validation-for="NewMarketDistrictId" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-12">
+                                <label asp-for="NewMarketMapUrl" class="form-label"></label>
+                                <input asp-for="NewMarketMapUrl" class="form-control" placeholder="https://maps.app.goo.gl/..." />
+                                <div class="form-text">On Google Maps, open the market, press Share and copy the link.</div>
+                                <span asp-validation-for="NewMarketMapUrl" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label d-block">Market days</label>
+                                <div class="d-flex flex-wrap gap-3">
+                                    @foreach (var day in MarketDays.Names)
+                                    {
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="NewMarketOpenDays" value="@day.Key"
+                                                   id="market-day-@day.Key" checked="@Model.NewMarketOpenDays.Contains(day.Key)" />
+                                            <label class="form-check-label" for="market-day-@day.Key">@day.Value</label>
+                                        </div>
+                                    }
+                                </div>
+                                <span asp-validation-for="NewMarketOpenDays" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="NewMarketOpenTime" class="form-label"></label>
+                                <input asp-for="NewMarketOpenTime" type="time" asp-format="{0:hh\:mm}" class="form-control" />
+                                <span asp-validation-for="NewMarketOpenTime" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="NewMarketCloseTime" class="form-label"></label>
+                                <input asp-for="NewMarketCloseTime" type="time" asp-format="{0:hh\:mm}" class="form-control" />
+                                <span asp-validation-for="NewMarketCloseTime" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* ===== 3. Your stall ===== *@
+                    <h2 class="h5 mt-4 mb-3">3. Your stall</h2>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label asp-for="StallCode" class="form-label"></label>
+                            <input asp-for="StallCode" class="form-control" placeholder="e.g. B-12" />
+                            <span asp-validation-for="StallCode" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-8">
+                            <label asp-for="StallGoogleUrl" class="form-label"></label>
+                            <input asp-for="StallGoogleUrl" class="form-control" placeholder="https://maps.app.goo.gl/... (optional)" />
+                            <span asp-validation-for="StallGoogleUrl" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <label asp-for="StallLocationNote" class="form-label"></label>
+                            <input asp-for="StallLocationNote" class="form-control" placeholder="e.g. Row B, next to gate 2 (optional)" />
+                            <span asp-validation-for="StallLocationNote" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label d-block">Days you sell</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                @foreach (var day in MarketDays.Names)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="SellingDays" value="@day.Key"
+                                               id="sell-day-@day.Key" checked="@Model.SellingDays.Contains(day.Key)" />
+                                        <label class="form-check-label" for="sell-day-@day.Key">@day.Value</label>
+                                    </div>
+                                }
+                            </div>
+                            <div class="form-text">Only days when the market is open.</div>
+                            <span asp-validation-for="SellingDays" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 mt-4">Send application</button>
+                </form>
+
+                <hr class="my-4" />
+
+                <p class="text-center mb-0">
+                    Already approved?
+                    <a asp-controller="Account" asp-action="Login">Log in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        var OTHER_MARKET = "@FarmerApplicationDto.OtherMarket";
+
+        // Show the "new market" fields only when "Other" is chosen,
+        // and show the chosen market's days and hours under the dropdown
+        function updateMarketSection() {
+            var selected = $("#MarketId option:selected");
+            var value = selected.val();
+
+            $("#new-market").toggleClass("d-none", value !== OTHER_MARKET);
+
+            if (!value) {
+                $("#market-hint").text("Choose the market where your stall is, or Other if it is not listed.");
+            } else if (value === OTHER_MARKET) {
+                $("#market-hint").text("Fill in the market details below.");
+            } else {
+                $("#market-hint").text("Open " + selected.data("days") + ", " + selected.data("hours"));
+            }
+        }
+
+        // Reload the districts of a city into a district dropdown
+        function loadDistricts(cityId, districtSelect) {
+            districtSelect.empty().append('<option value="">-- Select a district --</option>');
+
+            if (!cityId) return;
+
+            $.getJSON("@Url.Action("GetDistricts", "Account")", { cityId: cityId }, function (districts) {
+                $.each(districts, function (i, d) {
+                    districtSelect.append($("<option>").val(d.districtId).text(d.districtName));
+                });
+            });
+        }
+
+        // City of the address -> its districts
+        $("#CityId").on("change", function () {
+            loadDistricts($(this).val(), $("#DistrictId"));
+        });
+
+        // City of the new market -> its districts
+        $("#NewMarketCityId").on("change", function () {
+            loadDistricts($(this).val(), $("#NewMarketDistrictId"));
+        });
+
+        $("#MarketId").on("change", updateMarketSection);
+        updateMarketSection();
+    </script>
+}

@@ -1,0 +1,83 @@
+@{
+    // Highlight the menu item of the current page
+    string current = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    string Active(string controller) => current == controller ? "active" : "";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - MarketLink Admin</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+</head>
+<body class="admin-body">
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <a class="admin-brand" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
+            MarketLink <span>Admin</span>
+        </a>
+
+        <nav class="admin-nav">
+            <a class="@Active("Dashboard")" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+
+            <div class="admin-nav-label">Operations</div>
+            <a class="@Active("Markets")" asp-area="Admin" asp-controller="Markets" asp-action="Index">Markets</a>
+            <a class="@Active("Farmers")" asp-area="Admin" asp-controller="Farmers" asp-action="Index">Farmers</a>
+            <a class="@Active("Customers")" asp-area="Admin" asp-controller="Customers" asp-action="Index">Customers</a>
+
+            <div class="admin-nav-label">Settings</div>
+            <a class="@Active("Categories")" asp-area="Admin" asp-controller="Categories" asp-action="Index">Product categories</a>
+            <a class="@Active("ProductExps")" asp-area="Admin" asp-controller="ProductExps" asp-action="Index">Display periods</a>
+
+            <div class="admin-nav-label">Insights</div>
+            <a class="@Active("Reports")" asp-area="Admin" asp-controller="Reports" asp-action="Index">Reports</a>
+        </nav>
+    </aside>
+
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <h1 class="admin-title">@ViewData["Title"]</h1>
+            <div class="admin-user">
+                <span class="text-muted small">@User.Identity?.Name</span>
+                <a class="btn btn-sm btn-outline-secondary" asp-area="" asp-controller="Home" asp-action="Index">View site</a>
+                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Log out</button>
+                </form>
+            </div>
+        </header>
+
+        <main class="admin-content">
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["Success"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            @if (TempData["Warning"] != null)
+            {
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    @TempData["Warning"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @RenderBody()
+        </main>
+    </div>
+</div>
+
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

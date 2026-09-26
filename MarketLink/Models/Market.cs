@@ -19,20 +19,16 @@ namespace MarketLink.Models
         [Column("market_name")]
         public string MarketName { get; set; } = "";
 
+        // Google Maps link to the market
         [Required]
-        [StringLength(255)]
-        [Column("address")]
-        public string Address { get; set; } = "";
-
-        [Column("latitude", TypeName = "decimal(9,6)")]
-        public decimal? Latitude { get; set; }
-
-        [Column("longitude", TypeName = "decimal(9,6)")]
-        public decimal? Longitude { get; set; }
-
         [StringLength(500)]
         [Column("map_url")]
-        public string? MapUrl { get; set; }
+        public string MapUrl { get; set; } = "";
+
+        // Market photo, e.g. /uploads/markets/abc.jpg
+        [StringLength(500)]
+        [Column("image_url")]
+        public string? ImageUrl { get; set; }
 
         // Market days, e.g. "2,4,7" (2 = Monday)
         [Required]
@@ -49,8 +45,16 @@ namespace MarketLink.Models
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 
+        // Farmer who suggested this market in their application (null = created by admin).
+        // A suggested market stays hidden until the admin approves that farmer.
+        [Column("requested_by")]
+        public int? RequestedBy { get; set; }
+
         [ForeignKey("DistrictId")]
         public District? District { get; set; }
+
+        [ForeignKey("RequestedBy")]
+        public User? RequestedByUser { get; set; }
 
         public List<Stall> Stalls { get; set; } = new List<Stall>();
     }
