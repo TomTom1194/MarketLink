@@ -70,15 +70,19 @@
         {
             if (isCustomer)
             {
-                <button type="button" class="ml-bell" aria-label="Notifications (coming soon)" title="Notifications – coming soon">
+                <a class="ml-bell" asp-area="" asp-controller="Notifications" asp-action="Index" aria-label="Notifications" title="Notifications">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
-                </button>
+                </a>
                 <a class="ml-head-link ml-user" asp-controller="MyOrders" asp-action="Index" title="My account">
                     <span class="ml-avatar">@initial</span><span class="txt ml-user-name">@displayName</span>
                 </a>
             }
             else
             {
+                @if (User.IsInRole("farmer"))
+                {
+                    <a class="ml-head-link" asp-area="" asp-controller="Orders" asp-action="Index">Đơn hàng</a>
+                }
                 <span class="ml-head-link ml-user"><span class="ml-avatar">@initial</span><span class="txt ml-user-name">@displayName</span></span>
                 <form asp-controller="Account" asp-action="Logout" method="post" style="margin:0">
                     <button type="submit" class="ml-head-link"><span class="txt">Log out</span>@IconHelper.Icon("logout")</button>

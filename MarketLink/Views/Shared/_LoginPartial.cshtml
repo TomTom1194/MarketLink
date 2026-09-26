@@ -9,6 +9,10 @@
                 <a class="nav-link text-dark" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Admin portal</a>
             </li>
         }
+        if (User.IsInRole("farmer"))
+        {
+            <li class="nav-item"><a class="nav-link text-dark" asp-area="" asp-controller="Orders" asp-action="Index">Đơn hàng</a></li>
+        }
         <li class="nav-item">
             <span class="nav-link text-dark">
                 Hello, <strong>@User.Identity.Name</strong>
