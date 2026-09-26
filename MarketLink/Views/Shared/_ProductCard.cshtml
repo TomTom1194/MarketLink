@@ -1,0 +1,54 @@
+@model StockPrice
+@using MarketLink.Helpers
+@{
+    decimal available = Model.QuantityAvailable;
+    bool soldOut = available < 1;
+    bool lowStock = !soldOut && available <= 5;
+    var product = Model.Product!;
+}
+<div class="p-card">
+    <a class="img" asp-controller="Shop" asp-action="Detail" asp-route-id="@Model.StockPriceId" aria-label="@product.ProductName">
+        <img src="@product.ImageUrl" alt="@product.ProductName" loading="lazy" />
+    </a>
+    <div class="tags">
+        @if (lowStock)
+        {
+            <span class="tag low">Low stock</span>
+        }
+        @if (soldOut)
+        {
+            <span class="tag out">Sold out</span>
+        }
+    </div>
+    <div class="body">
+        <a class="name" asp-controller="Shop" asp-action="Detail" asp-route-id="@Model.StockPriceId">@product.ProductName</a>
+        <span class="spec">per @product.Unit</span>
+        <span class="price">@ShopHelper.Money(Model.Price)</span>
+        @if (Model.Stall != null)
+        {
+            <span class="stall">@IconHelper.Icon("pin") @(Model.Stall.Farmer != null ? Model.Stall.Farmer.BrandName : "") · Stall @Model.Stall.StallCode</span>
+        }
+        @if (soldOut)
+        {
+            <span class="stock-out">Sold out</span>
+        }
+        else if (lowStock)
+        {
+            <span class="stock-low">Only @ShopHelper.Qty(available) @product.Unit left</span>
+        }
+        else
+        {
+            <span class="stock-ok">@IconHelper.Icon("check", 16) @ShopHelper.Qty(available) @product.Unit left</span>
+        }
+        <div class="foot">
+            @if (soldOut)
+            {
+                <button class="btn-reserve" disabled>SOLD OUT</button>
+            }
+            else
+            {
+                <partial name="_ReserveButton" model="Model" />
+            }
+        </div>
+    </div>
+</div>

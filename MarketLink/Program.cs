@@ -14,6 +14,12 @@ builder.Services.AddDbContext<MarketLinkDbContext>(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICustomerAccountService, CustomerAccountService>();
+builder.Services.AddScoped<IShopService, ShopService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<ICheckoutService, CheckoutService>();
+builder.Services.AddScoped<ICustomerOrderService, CustomerOrderService>();
+builder.Services.AddScoped<IFavoriteService, FavoriteService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
 
 // Cookie-based login
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

@@ -28,11 +28,9 @@ namespace MarketLink.Models
         [Column("location_note")]
         public string? LocationNote { get; set; }
 
-        [Column("latitude", TypeName = "decimal(9,6)")]
-        public decimal? Latitude { get; set; }
-
-        [Column("longitude", TypeName = "decimal(9,6)")]
-        public decimal? Longitude { get; set; }
+        [StringLength(500)]
+        [Column("google_url")]
+        public string? GoogleUrl { get; set; }
 
         // Days the stall sells, e.g. "4,7"
         [Required]

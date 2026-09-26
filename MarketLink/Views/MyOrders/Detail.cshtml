@@ -1,0 +1,179 @@
+@model Order
+@using MarketLink.Helpers
+@{
+    ViewData["Title"] = "Order " + Model.OrderCode;
+    ViewData["AccountMenu"] = "orders";
+    Layout = "_AccountLayout";
+
+    var stall = Model.Stall!;
+    var market = stall.Market!;
+    var farmer = stall.Farmer!;
+    bool canCancel = Model.Status == "placed" || Model.Status == "accepted";
+    string directionsLink = ShopHelper.MapLink(stall, market);
+}
+
+<a asp-action="Index" style="font-size:15px;font-weight:700;text-decoration:none">‹ My orders</a>
+
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <h1 class="title">Order @Model.OrderCode</h1>
+    <span class="badge-ml @ShopHelper.StatusClass(Model.Status)">@ShopHelper.StatusText(Model.Status)</span>
+</div>
+
+<div class="detail-layout">
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div class="card-box">
+            <span style="display:block;font-size:17px;font-weight:800;margin-bottom:12px">Status</span>
+            <ol class="timeline">
+                <li>
+                    <span class="dot">@IconHelper.Icon("check", 14)</span>
+                    <span><strong>Placed</strong><br /><span class="muted">@Model.PlacedAt.ToString("dd/MM/yyyy HH:mm")</span></span>
+                </li>
+                @if (Model.AcceptedAt != null)
+                {
+                    <li>
+                        <span class="dot">@IconHelper.Icon("check", 14)</span>
+                        <span><strong>Accepted by farmer</strong><br /><span class="muted">@Model.AcceptedAt.Value.ToString("dd/MM/yyyy HH:mm")</span></span>
+                    </li>
+                }
+                @if (Model.Status == "rejected")
+                {
+                    <li>
+                        <span class="dot red">@IconHelper.Icon("x", 14)</span>
+                        <span><strong>Rejected by farmer</strong><br /><span class="muted">@(Model.RejectedAt != null ? Model.RejectedAt.Value.ToString("dd/MM/yyyy HH:mm") : "") · @Model.RejectReason</span></span>
+                    </li>
+                }
+                else if (Model.Status == "cancelled")
+                {
+                    <li>
+                        <span class="dot red">@IconHelper.Icon("x", 14)</span>
+                        <span><strong>Cancelled by you</strong><br /><span class="muted">@(Model.CancelledAt != null ? Model.CancelledAt.Value.ToString("dd/MM/yyyy HH:mm") : "") · @Model.CancelReason</span></span>
+                    </li>
+                }
+                else if (Model.Status == "completed")
+                {
+                    <li>
+                        <span class="dot">@IconHelper.Icon("check", 14)</span>
+                        <span><strong>Picked up</strong><br /><span class="muted">@(Model.CompletedAt != null ? Model.CompletedAt.Value.ToString("dd/MM/yyyy HH:mm") : "")</span></span>
+                    </li>
+                }
+                else if (Model.Status == "no_show")
+                {
+                    <li>
+                        <span class="dot red">!</span>
+                        <span><strong>Not picked up</strong></span>
+                    </li>
+                }
+                else
+                {
+                    if (Model.AcceptedAt == null)
+                    {
+                        <li>
+                            <span class="dot grey">2</span>
+                            <span><strong style="color:#5F6B65">Waiting for the farmer to accept</strong></span>
+                        </li>
+                    }
+                    <li>
+                        <span class="dot grey">3</span>
+                        <span><strong style="color:#5F6B65">Pick up on @Model.PickupDate.ToString("dddd, dd/MM")</strong></span>
+                    </li>
+                }
+            </ol>
+        </div>
+
+        <div class="card-box" style="display:flex;flex-direction:column;gap:10px">
+            <span style="font-size:17px;font-weight:800">Items from @farmer.BrandName</span>
+            @foreach (var it in Model.Items)
+            {
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #EEF1EF">
+                    <img class="thumb" style="width:52px;height:52px" src="@it.ImageUrl" alt="" />
+                    <span style="flex:1 1 140px;display:flex;flex-direction:column">
+                        <span style="font-size:15px;font-weight:600">@it.ProductName</span>
+                        <span class="muted">@it.CategoryName · @ShopHelper.Money(it.UnitPrice) / @it.Unit</span>
+                    </span>
+                    <span style="font-size:15px;color:#4A5550">× @ShopHelper.Qty(it.Quantity) @it.Unit</span>
+                    <span style="min-width:80px;text-align:right;font-size:16px;font-weight:800">@ShopHelper.Money(it.UnitPrice * it.Quantity)</span>
+                </div>
+            }
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;border-top:1px solid #E3E7E5">
+                <span style="font-size:15px;font-weight:700">Total · pay at pickup</span>
+                <span style="font-size:22px;font-weight:800;color:#E53935">@ShopHelper.Money(Model.TotalAmount)</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div class="pickup-box" style="background:#fff">
+            <span class="head">Pickup</span>
+            <div class="info-grid">
+                <div><span class="k">Market</span><span class="v">@market.MarketName</span></div>
+                <div><span class="k">Stall</span><span class="v">@stall.StallCode</span></div>
+                <div><span class="k">Date</span><span class="v">@Model.PickupDate.ToString("ddd, dd/MM/yyyy")</span></div>
+                <div><span class="k">Time</span><span class="v">@ShopHelper.Hours(Model.PickupFrom, Model.PickupTo)</span></div>
+            </div>
+            <span class="muted">@IconHelper.Icon("pin") @ShopHelper.MarketAddress(market)</span>
+            @if (!string.IsNullOrEmpty(stall.LocationNote))
+            {
+                <span class="muted">Stall location: @stall.LocationNote</span>
+            }
+            <a class="btn-ml" href="@directionsLink" target="_blank">@IconHelper.Icon("pin") Get directions</a>
+        </div>
+
+        <div class="card-box" style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:17px;font-weight:800">Receiver</span>
+            <span>@Model.PickupName · @Model.PickupPhone</span>
+            @if (!string.IsNullOrEmpty(Model.CustomerNote))
+            {
+                <span class="muted">Note: @Model.CustomerNote</span>
+            }
+        </div>
+
+        <div class="farmer-row" style="background:#fff;flex-wrap:wrap">
+            <span class="farmer-avatar">@farmer.BrandName.Substring(0, 1).ToUpper()</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:16px;font-weight:700">@farmer.BrandName</span>
+                <span class="muted">@farmer.ContactPerson</span>
+            </div>
+            <span style="display:flex;gap:6px;flex-wrap:wrap">
+                @if (farmer.User != null)
+                {
+                    <a class="btn-ml outline fav-btn" href="tel:@farmer.User.Phone">@IconHelper.Icon("phone", 16) Call</a>
+                }
+                <partial name="_FavoriteFarmerButton" model="farmer.FarmerId" view-data='new ViewDataDictionary(ViewData) { { "IsSaved", (bool)ViewBag.IsFavorite } }' />
+            </span>
+        </div>
+
+        @if (canCancel)
+        {
+            <div class="card-box" id="cancel">
+                <button type="button" class="btn-ml danger block" onclick="document.getElementById('cancelDialog').classList.add('show')">Cancel this order</button>
+            </div>
+        }
+    </div>
+</div>
+
+@if (canCancel)
+{
+    <div class="modal-bg" id="cancelDialog" role="dialog" aria-modal="true" aria-labelledby="cancelTitle">
+        <form class="modal-box" asp-action="Cancel" asp-route-id="@Model.OrderId" method="post">
+            <span id="cancelTitle" style="font-size:19px;font-weight:800">Cancel order @Model.OrderCode?</span>
+            <span class="muted">The farmer will be notified and the items will be released for other customers.</span>
+            <div class="field">
+                <label for="reason">Reason (required)</label>
+                <textarea id="reason" name="reason" rows="3" maxlength="500" required placeholder="e.g. I can't come to the market that day"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                <button type="button" class="btn-ml grey" onclick="document.getElementById('cancelDialog').classList.remove('show')">Keep order</button>
+                <button type="submit" class="btn-ml" style="background:#C62828">Yes, cancel order</button>
+            </div>
+        </form>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        var cancelDialog = document.getElementById("cancelDialog");
+        if (cancelDialog && window.location.hash == "#cancel") {
+            cancelDialog.classList.add("show");
+        }
+    </script>
+}

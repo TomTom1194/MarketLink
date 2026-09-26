@@ -1,0 +1,37 @@
+@model StockPrice
+@using MarketLink.Services
+@inject ICheckoutService CheckoutService
+@{
+    string buttonText = ViewData["ButtonText"] as string ?? "RESERVE";
+    string buttonClass = ViewData["ButtonClass"] as string ?? "btn-reserve";
+    string currentPage = Context.Request.Path + Context.Request.QueryString;
+    bool isLoggedIn = User.Identity != null && User.Identity.IsAuthenticated;
+
+    var product = Model.Product!;
+    var stall = Model.Stall!;
+    var market = stall.Market!;
+
+    var dateList = new List<string>();
+    foreach (DateTime d in CheckoutService.GetPickupDates(stall, market))
+    {
+        dateList.Add(d.ToString("yyyy-MM-dd"));
+    }
+}
+@if (!isLoggedIn)
+{
+    <a class="@buttonClass" style="display:flex;align-items:center;justify-content:center;text-decoration:none" asp-controller="Account" asp-action="Login" asp-route-returnUrl="@currentPage">@buttonText</a>
+}
+else
+{
+    <button type="button" class="@buttonClass" onclick="openReserve(this)"
+            data-id="@Model.StockPriceId"
+            data-name="@product.ProductName"
+            data-image="@product.ImageUrl"
+            data-price="@Model.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+            data-unit="@product.Unit"
+            data-max="@((int)Model.QuantityAvailable)"
+            data-stall="@(stall.Farmer != null ? stall.Farmer.BrandName : "") · Stall @stall.StallCode · @market.MarketName"
+            data-open="@market.OpenTime.ToString(@"hh\:mm")"
+            data-close="@market.CloseTime.ToString(@"hh\:mm")"
+            data-dates="@string.Join(",", dateList)">@buttonText</button>
+}

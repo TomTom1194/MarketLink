@@ -1,0 +1,64 @@
+@model List<FavoriteFarmer>
+@{
+    ViewData["Title"] = "Favorite farmers";
+    ViewData["AccountMenu"] = "favorites";
+    Layout = "_AccountLayout";
+    Dictionary<int, int> productCounts = ViewBag.ProductCounts;
+}
+
+<h1 class="title">Favorite farmers</h1>
+
+@if (Model.Count == 0)
+{
+    <div class="empty">
+        <span class="icon">@IconHelper.Icon("heart", 48)</span>
+        <span class="t">No favorite farmers yet</span>
+        <span class="d">Tap “Save farmer” on a product page to follow the farmers you like.</span>
+        <a class="btn-ml" asp-controller="Shop" asp-action="Products">Browse products</a>
+    </div>
+}
+else
+{
+    <span class="muted">You follow @Model.Count @(Model.Count == 1 ? "farmer" : "farmers").</span>
+    <div class="fav-grid">
+        @foreach (var fav in Model)
+        {
+            var farmer = fav.Farmer!;
+            int productCount = productCounts.ContainsKey(farmer.FarmerId) ? productCounts[farmer.FarmerId] : 0;
+
+            var marketNames = new List<string>();
+            Stall? firstStall = null;
+            foreach (var s in farmer.Stalls)
+            {
+                if (s.IsActive && s.Market != null)
+                {
+                    if (firstStall == null) firstStall = s;
+                    if (!marketNames.Contains(s.Market.MarketName)) marketNames.Add(s.Market.MarketName);
+                }
+            }
+
+            <div class="fav-card">
+                <span class="farmer-avatar" style="width:64px;height:64px;font-size:26px;border:3px solid #E6F4EA">@farmer.BrandName.Substring(0, 1).ToUpper()</span>
+                <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:160px">
+                    <span style="font-size:16px;font-weight:700">@farmer.BrandName</span>
+                    <span class="muted">@(marketNames.Count > 0 ? string.Join(" · ", marketNames) : "No active stall")</span>
+                    @if (farmer.ApprovalStatus != "approved")
+                    {
+                        <span class="stock-low">This farmer is not selling right now</span>
+                    }
+                    else
+                    {
+                        <span style="font-size:14px;color:#0B7A3E;font-weight:600">@productCount @(productCount == 1 ? "product" : "products") on sale</span>
+                    }
+                </span>
+                <span style="display:flex;gap:6px;flex-wrap:wrap">
+                    <partial name="_FavoriteFarmerButton" model="farmer.FarmerId" view-data='new ViewDataDictionary(ViewData) { { "IsSaved", true } }' />
+                    @if (firstStall != null)
+                    {
+                        <a class="btn-ml outline fav-btn" asp-controller="Shop" asp-action="Products" asp-route-marketId="@firstStall.MarketId" asp-route-keyword="@farmer.BrandName">View stall</a>
+                    }
+                </span>
+            </div>
+        }
+    </div>
+}
