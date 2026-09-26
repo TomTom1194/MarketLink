@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using MarketLink.Helpers;
+using MarketLink.Dtos;
 using MarketLink.Models;
 using MarketLink.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +13,9 @@ namespace MarketLink.Controllers
         private readonly IShopService _shopService;
         private readonly ICheckoutService _checkoutService;
         private readonly IFavoriteService _favoriteService;
+        private const int ProductPageSize = 20;
+        private const int MarketPageSize = 8;
+        private const int SearchMarketPageSize = 5;
 
         public ShopController(IShopService shopService, ICheckoutService checkoutService, IFavoriteService favoriteService)
         {
@@ -21,16 +25,27 @@ namespace MarketLink.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(int? cityId, int? districtId, double? lat, double? lng)
+        public async Task<IActionResult> Index(int? cityId, int? districtId, double? lat, double? lng, int page = 1, int districtPage = 1)
         {
+            var marketList = new List<MarketDistanceDto>();
+            bool hasLocation = false;
             if (lat != null && lng != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)
             {
-                ViewBag.NearestMarkets = await _shopService.GetNearestMarketsAsync(lat.Value, lng.Value);
+                marketList = await _shopService.GetNearestMarketsAsync(lat.Value, lng.Value);
+                hasLocation = true;
             }
             else
             {
-                ViewBag.AllMarkets = await _shopService.GetActiveMarketsAsync(50);
+                foreach (var m in await _shopService.GetActiveMarketsAsync(1000))
+                {
+                    marketList.Add(new MarketDistanceDto { Market = m });
+                }
             }
+
+            var marketPager = PagerDto.Create(page, marketList.Count, MarketPageSize, "page", "nearby");
+            ViewBag.MarketList = marketList.Skip(marketPager.Skip()).Take(marketPager.PageSize).ToList();
+            ViewBag.MarketPager = marketPager;
+            ViewBag.HasLocation = hasLocation;
 
             var cities = await _shopService.GetCitiesAsync();
             ViewBag.Cities = new SelectList(cities, "CityId", "CityName", cityId);
@@ -48,11 +63,46 @@ namespace MarketLink.Controllers
                 markets = await _shopService.GetMarketsAsync(districtId.Value);
             }
 
+            var districtPager = PagerDto.Create(districtPage, markets.Count, MarketPageSize, "districtPage", "districtMarkets");
+            ViewBag.DistrictPager = districtPager;
+
             ViewBag.CityId = cityId;
             ViewBag.DistrictId = districtId;
             ViewBag.SelectedMarketId = GetSelectedMarketId();
 
-            return View(markets);
+            return View(markets.Skip(districtPager.Skip()).Take(districtPager.PageSize).ToList());
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Search(string? keyword, double? lat, double? lng, int page = 1)
+        {
+            bool hasLocation = lat != null && lng != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+            if (!hasLocation)
+            {
+                lat = null;
+                lng = null;
+            }
+
+            var results = new List<MarketSearchResultDto>();
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                results = await _shopService.SearchAllMarketsAsync(keyword, lat, lng, GetSelectedMarketId());
+            }
+
+            int productCount = 0;
+            foreach (var r in results)
+            {
+                productCount = productCount + r.Products.Count;
+            }
+
+            var pager = PagerDto.Create(page, results.Count, SearchMarketPageSize, "page", "results");
+            ViewBag.Pager = pager;
+            ViewBag.Keyword = keyword == null ? "" : keyword.Trim();
+            ViewBag.ProductCount = productCount;
+            ViewBag.HasLocation = hasLocation;
+            ViewBag.SelectedMarketId = GetSelectedMarketId();
+
+            return View(results.Skip(pager.Skip()).Take(pager.PageSize).ToList());
         }
 
         [HttpGet]
@@ -99,7 +149,7 @@ namespace MarketLink.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Products(int? marketId, string? keyword, int? categoryId, string? sort)
+        public async Task<IActionResult> Products(int? marketId, string? keyword, int? categoryId, int? farmerId, string? sort, int page = 1)
         {
             if (marketId == null)
             {
@@ -119,12 +169,27 @@ namespace MarketLink.Controllers
                 return RedirectToAction("Index");
             }
 
-            var products = await _shopService.SearchProductsAsync(marketId.Value, keyword, categoryId, sort);
+            FarmerProfile? farmer = null;
+            if (farmerId != null)
+            {
+                farmer = await _shopService.GetFarmerAsync(farmerId.Value);
+                if (farmer == null)
+                {
+                    farmerId = null;
+                }
+            }
+
+            int productCount = await _shopService.CountProductsAsync(marketId.Value, keyword, categoryId, farmerId);
+            var pager = PagerDto.Create(page, productCount, ProductPageSize, "page", "products");
+            var products = await _shopService.SearchProductsAsync(marketId.Value, keyword, categoryId, farmerId, sort, pager);
+            ViewBag.Pager = pager;
 
             ViewBag.Market = market;
             ViewBag.Categories = await _shopService.GetCategoriesAsync();
             ViewBag.Keyword = keyword;
             ViewBag.CategoryId = categoryId;
+            ViewBag.FarmerId = farmerId;
+            ViewBag.FarmerName = farmer != null ? farmer.BrandName : "";
             ViewBag.Sort = sort;
 
             return View(products);

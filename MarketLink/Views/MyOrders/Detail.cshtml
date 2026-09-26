@@ -9,6 +9,7 @@
     var market = stall.Market!;
     var farmer = stall.Farmer!;
     bool canCancel = Model.Status == "placed" || Model.Status == "accepted";
+    bool wasAccepted = Model.Status == "accepted" || Model.Status == "completed" || Model.Status == "no_show" || Model.AcceptedAt != null;
     string directionsLink = ShopHelper.MapLink(stall, market);
 }
 
@@ -28,25 +29,31 @@
                     <span class="dot">@IconHelper.Icon("check", 14)</span>
                     <span><strong>Placed</strong><br /><span class="muted">@Model.PlacedAt.ToString("dd/MM/yyyy HH:mm")</span></span>
                 </li>
-                @if (Model.AcceptedAt != null)
+                @if (wasAccepted)
                 {
                     <li>
                         <span class="dot">@IconHelper.Icon("check", 14)</span>
-                        <span><strong>Accepted by farmer</strong><br /><span class="muted">@Model.AcceptedAt.Value.ToString("dd/MM/yyyy HH:mm")</span></span>
+                        <span>
+                            <strong>Accepted by farmer</strong>
+                            @if (Model.AcceptedAt != null)
+                            {
+                                <br /><span class="muted">@Model.AcceptedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                            }
+                        </span>
                     </li>
                 }
                 @if (Model.Status == "rejected")
                 {
                     <li>
                         <span class="dot red">@IconHelper.Icon("x", 14)</span>
-                        <span><strong>Rejected by farmer</strong><br /><span class="muted">@(Model.RejectedAt != null ? Model.RejectedAt.Value.ToString("dd/MM/yyyy HH:mm") : "") · @Model.RejectReason</span></span>
+                        <span><strong>Rejected by farmer</strong><br /><span class="muted">@(Model.RejectedAt != null ? Model.RejectedAt.Value.ToString("dd/MM/yyyy HH:mm") + " · " : "")@Model.RejectReason</span></span>
                     </li>
                 }
                 else if (Model.Status == "cancelled")
                 {
                     <li>
                         <span class="dot red">@IconHelper.Icon("x", 14)</span>
-                        <span><strong>Cancelled by you</strong><br /><span class="muted">@(Model.CancelledAt != null ? Model.CancelledAt.Value.ToString("dd/MM/yyyy HH:mm") : "") · @Model.CancelReason</span></span>
+                        <span><strong>Cancelled by you</strong><br /><span class="muted">@(Model.CancelledAt != null ? Model.CancelledAt.Value.ToString("dd/MM/yyyy HH:mm") + " · " : "")@Model.CancelReason</span></span>
                     </li>
                 }
                 else if (Model.Status == "completed")
@@ -65,7 +72,7 @@
                 }
                 else
                 {
-                    if (Model.AcceptedAt == null)
+                    if (Model.Status == "placed")
                     {
                         <li>
                             <span class="dot grey">2</span>
@@ -74,14 +81,14 @@
                     }
                     <li>
                         <span class="dot grey">3</span>
-                        <span><strong style="color:#5F6B65">Pick up on @Model.PickupDate.ToString("dddd, dd/MM")</strong></span>
+                        <span><strong style="color:#5F6B65">Pick up on @Model.PickupDate.ToString("dddd, dd/MM") · @ShopHelper.Hours(Model.PickupFrom, Model.PickupTo)</strong></span>
                     </li>
                 }
             </ol>
         </div>
 
         <div class="card-box" style="display:flex;flex-direction:column;gap:10px">
-            <span style="font-size:17px;font-weight:800">Items from @farmer.BrandName</span>
+            <span style="font-size:17px;font-weight:800">Items from <a class="plain-link" asp-controller="Shop" asp-action="Products" asp-route-marketId="@market.MarketId" asp-route-farmerId="@farmer.FarmerId" title="See all products from this farmer">@farmer.BrandName</a></span>
             @foreach (var it in Model.Items)
             {
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #EEF1EF">
@@ -105,7 +112,7 @@
         <div class="pickup-box" style="background:#fff">
             <span class="head">Pickup</span>
             <div class="info-grid">
-                <div><span class="k">Market</span><span class="v">@market.MarketName</span></div>
+                <div><span class="k">Market</span><a class="v plain-link" asp-controller="Shop" asp-action="Products" asp-route-marketId="@market.MarketId" title="See products at this market">@market.MarketName</a></div>
                 <div><span class="k">Stall</span><span class="v">@stall.StallCode</span></div>
                 <div><span class="k">Date</span><span class="v">@Model.PickupDate.ToString("ddd, dd/MM/yyyy")</span></div>
                 <div><span class="k">Time</span><span class="v">@ShopHelper.Hours(Model.PickupFrom, Model.PickupTo)</span></div>
@@ -130,7 +137,7 @@
         <div class="farmer-row" style="background:#fff;flex-wrap:wrap">
             <span class="farmer-avatar">@farmer.BrandName.Substring(0, 1).ToUpper()</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:2px">
-                <span style="font-size:16px;font-weight:700">@farmer.BrandName</span>
+                <a class="plain-link" style="font-size:16px;font-weight:700" asp-controller="Shop" asp-action="Products" asp-route-marketId="@market.MarketId" asp-route-farmerId="@farmer.FarmerId" title="See all products from this farmer">@farmer.BrandName</a>
                 <span class="muted">@farmer.ContactPerson</span>
             </div>
             <span style="display:flex;gap:6px;flex-wrap:wrap">
@@ -141,6 +148,14 @@
                 <partial name="_FavoriteFarmerButton" model="farmer.FarmerId" view-data='new ViewDataDictionary(ViewData) { { "IsSaved", (bool)ViewBag.IsFavorite } }' />
             </span>
         </div>
+
+        @if (Model.Status == "completed")
+        {
+            <form class="card-box" asp-action="Reorder" asp-route-id="@Model.OrderId" method="post" style="display:flex;flex-direction:column;gap:8px">
+                <button type="submit" class="btn-ml block">@IconHelper.Icon("basket") Reorder these items</button>
+                <span class="muted">Adds the same products and quantities to your basket. We will tell you if a price or the quantity left has changed.</span>
+            </form>
+        }
 
         @if (canCancel)
         {

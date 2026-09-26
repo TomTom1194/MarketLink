@@ -1,0 +1,13 @@
+@{
+    string? status = ViewBag.Status;
+    int scheduleCount = ViewBag.ScheduleCount ?? 0;
+}
+<nav class="tabs" aria-label="Filter orders">
+    <a class="@(status == "schedule" ? "on" : "")" asp-action="Schedule">@IconHelper.Icon("calendar", 16) Pickup schedule@(scheduleCount > 0 ? " (" + scheduleCount + ")" : "")</a>
+    <a class="@(status == "all" ? "on" : "")" asp-action="Index" asp-route-status="all">All</a>
+    <a class="@(status == "placed" ? "on" : "")" asp-action="Index" asp-route-status="placed">Waiting for farmer</a>
+    <a class="@(status == "accepted" ? "on" : "")" asp-action="Index" asp-route-status="accepted">Ready for pickup</a>
+    <a class="@(status == "completed" ? "on" : "")" asp-action="Index" asp-route-status="completed">Picked up</a>
+    <a class="@(status == "cancelled" ? "on" : "")" asp-action="Index" asp-route-status="cancelled">Cancelled</a>
+    <a class="@(status == "rejected" ? "on" : "")" asp-action="Index" asp-route-status="rejected">Rejected</a>
+</nav>

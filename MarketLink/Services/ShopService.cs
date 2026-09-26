@@ -36,6 +36,11 @@ namespace MarketLink.Services
                 .ToListAsync();
         }
 
+        public async Task<FarmerProfile?> GetFarmerAsync(int farmerId)
+        {
+            return await _context.FarmerProfiles.FirstOrDefaultAsync(f => f.FarmerId == farmerId);
+        }
+
         public async Task<Market?> GetMarketAsync(int marketId)
         {
             return await _context.Markets
@@ -52,7 +57,7 @@ namespace MarketLink.Services
                 .ToListAsync();
         }
 
-        public async Task<List<StockPrice>> SearchProductsAsync(int marketId, string? keyword, int? categoryId, string? sort)
+        private IQueryable<StockPrice> FilterProducts(int marketId, string? keyword, int? categoryId, int? farmerId)
         {
             DateTime now = DateTime.Now;
 
@@ -83,24 +88,46 @@ namespace MarketLink.Services
                     || sp.Product.Category!.ParentId == categoryId);
             }
 
+            if (farmerId != null)
+            {
+                query = query.Where(sp => sp.Stall!.FarmerId == farmerId);
+            }
+
+            return query;
+        }
+
+        public async Task<int> CountProductsAsync(int marketId, string? keyword, int? categoryId, int? farmerId)
+        {
+            return await FilterProducts(marketId, keyword, categoryId, farmerId).CountAsync();
+        }
+
+        public async Task<List<StockPrice>> SearchProductsAsync(int marketId, string? keyword, int? categoryId, int? farmerId, string? sort, PagerDto pager)
+        {
+            var query = FilterProducts(marketId, keyword, categoryId, farmerId);
+            IOrderedQueryable<StockPrice> sortedQuery;
+
             if (sort == "price_asc")
             {
-                query = query.OrderBy(sp => sp.Price);
+                sortedQuery = query.OrderBy(sp => sp.Price);
             }
             else if (sort == "price_desc")
             {
-                query = query.OrderByDescending(sp => sp.Price);
+                sortedQuery = query.OrderByDescending(sp => sp.Price);
             }
             else if (sort == "name")
             {
-                query = query.OrderBy(sp => sp.Product!.ProductName);
+                sortedQuery = query.OrderBy(sp => sp.Product!.ProductName);
             }
             else
             {
-                query = query.OrderByDescending(sp => sp.Product!.PublishedAt);
+                sortedQuery = query.OrderByDescending(sp => sp.Product!.PublishedAt);
             }
 
-            return await query.ToListAsync();
+            return await sortedQuery
+                .ThenBy(sp => sp.StockPriceId)
+                .Skip(pager.Skip())
+                .Take(pager.PageSize)
+                .ToListAsync();
         }
 
         public async Task<StockPrice?> GetProductDetailAsync(int stockPriceId)
@@ -183,6 +210,79 @@ namespace MarketLink.Services
                 .OrderBy(f => f.BrandName)
                 .Take(take)
                 .ToListAsync();
+        }
+
+        public async Task<List<MarketSearchResultDto>> SearchAllMarketsAsync(string keyword, double? latitude, double? longitude, int? currentMarketId)
+        {
+            string searchText = keyword.Trim();
+            DateTime now = DateTime.Now;
+
+            var products = await _context.StockPrices
+                .Include(sp => sp.Product)
+                .ThenInclude(p => p!.Category)
+                .Include(sp => sp.Stall)
+                .ThenInclude(s => s!.Farmer)
+                .Include(sp => sp.Stall)
+                .ThenInclude(s => s!.Market)
+                .ThenInclude(m => m!.District)
+                .ThenInclude(d => d!.City)
+                .Where(sp => sp.EffectiveTo == null
+                    && sp.Stall!.IsActive
+                    && sp.Stall.Market!.IsActive
+                    && sp.Stall.Farmer!.ApprovalStatus == "approved"
+                    && sp.Product!.Status == "active"
+                    && sp.Product.ExpiresAt > now
+                    && sp.Product.ProductName.Contains(searchText))
+                .ToListAsync();
+
+            var results = new List<MarketSearchResultDto>();
+            foreach (var sp in products)
+            {
+                var market = sp.Stall!.Market!;
+                MarketSearchResultDto? group = null;
+                foreach (var r in results)
+                {
+                    if (r.Market.MarketId == market.MarketId)
+                    {
+                        group = r;
+                    }
+                }
+                if (group == null)
+                {
+                    group = new MarketSearchResultDto { Market = market };
+                    double marketLat;
+                    double marketLng;
+                    if (latitude != null && longitude != null && ShopHelper.CoordinatesFromMapUrl(market.MapUrl, out marketLat, out marketLng))
+                    {
+                        group.DistanceKm = CalculateDistanceKm(latitude.Value, longitude.Value, marketLat, marketLng);
+                    }
+                    results.Add(group);
+                }
+                group.Products.Add(sp);
+            }
+
+            foreach (var group in results)
+            {
+                group.Products = group.Products
+                    .OrderBy(sp => sp.QuantityAvailable < 1 ? 1 : 0)
+                    .ThenBy(sp => sp.Product!.ProductName)
+                    .ThenBy(sp => sp.Price)
+                    .ToList();
+            }
+
+            if (latitude != null && longitude != null)
+            {
+                return results
+                    .OrderBy(r => r.DistanceKm ?? double.MaxValue)
+                    .ThenBy(r => r.Market.MarketName)
+                    .ToList();
+            }
+
+            return results
+                .OrderBy(r => r.Market.MarketId == currentMarketId ? 0 : 1)
+                .ThenByDescending(r => r.Products.Count)
+                .ThenBy(r => r.Market.MarketName)
+                .ToList();
         }
 
         public async Task<List<MarketDistanceDto>> GetNearestMarketsAsync(double latitude, double longitude)

@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using MarketLink.Dtos;
+using MarketLink.Helpers;
+using MarketLink.Models;
 using MarketLink.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,7 +48,13 @@ namespace MarketLink.Controllers
                 return View();
             }
 
-            ViewBag.CartNotices = await _cartService.RefreshCartAsync(customerId, marketId.Value);
+            List<string> cartNotices = await _cartService.RefreshCartAsync(customerId, marketId.Value);
+            string? reorderNotices = TempData["ReorderNotices"] as string;
+            if (!string.IsNullOrEmpty(reorderNotices))
+            {
+                cartNotices.InsertRange(0, reorderNotices.Split('\n'));
+            }
+            ViewBag.CartNotices = cartNotices;
 
             var cart = await _cartService.GetCartAsync(customerId, marketId.Value);
 
@@ -55,19 +63,21 @@ namespace MarketLink.Controllers
                 return RedirectToAction("Index", new { marketId = allCarts[0].MarketId });
             }
 
-            var pickupDates = new Dictionary<int, DateTime?>();
+            var commonDates = new List<DateTime>();
             if (cart != null)
             {
+                var stalls = new List<Stall>();
                 foreach (var item in cart.Items)
                 {
                     var stall = item.StockPrice!.Stall!;
-                    if (!pickupDates.ContainsKey(stall.StallId))
+                    if (ShopHelper.ItemStatus(item.StockPrice) == "ok" && !stalls.Any(s => s.StallId == stall.StallId))
                     {
-                        pickupDates[stall.StallId] = _checkoutService.GetNextPickupDate(stall, cart.Market!);
+                        stalls.Add(stall);
                     }
                 }
+                commonDates = _checkoutService.GetCommonPickupDates(stalls, cart.Market!);
             }
-            ViewBag.PickupDates = pickupDates;
+            ViewBag.CommonDates = commonDates;
 
             var customer = await _checkoutService.GetCustomerAsync(customerId);
             var checkoutForm = new CheckoutDto { MarketId = marketId.Value };

@@ -36,7 +36,7 @@ public class HomeController : Controller
 
         ViewBag.CurrentMarket = currentMarket;
         ViewBag.Categories = await _shopService.GetCategoriesAsync();
-        ViewBag.Markets = await _shopService.GetActiveMarketsAsync(8);
+        ViewBag.Markets = await _shopService.GetActiveMarketsAsync(12);
         ViewBag.NewestProducts = await _shopService.GetNewestProductsAsync(marketId, 12);
         ViewBag.Farmers = await _shopService.GetFeaturedFarmersAsync(6);
 

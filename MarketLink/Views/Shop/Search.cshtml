@@ -1,0 +1,154 @@
+@model List<MarketSearchResultDto>
+@using MarketLink.Helpers
+@{
+    string keyword = ViewBag.Keyword;
+    PagerDto pager = ViewBag.Pager;
+    int productCount = ViewBag.ProductCount;
+    bool hasLocation = ViewBag.HasLocation;
+    int? selectedMarketId = ViewBag.SelectedMarketId;
+    const int maxCards = 10;
+
+    ViewData["Title"] = keyword == "" ? "Search" : "Search: " + keyword;
+    Layout = "_ShopLayout";
+}
+
+<nav class="breadcrumb-ml" aria-label="Breadcrumb">
+    <a asp-controller="Home" asp-action="Index">Home</a><span>›</span><strong>Search</strong>
+</nav>
+
+<div class="card-box">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+            @if (keyword == "")
+            {
+                <h1 class="title" style="margin-bottom:6px">Search all markets</h1>
+                <span class="muted">Type a product name in the search box above, for example “mango”.</span>
+            }
+            else
+            {
+                <h1 class="title" style="margin-bottom:6px">Results for “@keyword”</h1>
+                <span class="muted">@productCount @(productCount == 1 ? "product" : "products") at @pager.TotalCount @(pager.TotalCount == 1 ? "market" : "markets")</span>
+                <br />
+                @if (hasLocation)
+                {
+                    <span class="muted">Markets are sorted by distance from your current location.</span>
+                }
+                else
+                {
+                    <span class="muted" id="locationStatus">Allow location access to see the nearest markets first.</span>
+                }
+            }
+        </div>
+        @if (keyword != "")
+        {
+            <button type="button" class="btn-ml outline" id="locationButton" onclick="useMyLocation()">@IconHelper.Icon("pin") @(hasLocation ? "Update my location" : "Use my location")</button>
+        }
+    </div>
+</div>
+
+@if (keyword != "" && pager.TotalCount == 0)
+{
+    <div class="empty">
+        <span class="icon">@IconHelper.Icon("basket", 48)</span>
+        <span class="t">No market sells “@keyword” right now</span>
+        <span class="d">Check the spelling or try a shorter word, like “mango” instead of “green mangoes”.</span>
+        <a class="btn-ml" asp-action="Index">Browse markets</a>
+    </div>
+}
+
+<div id="results" class="search-results">
+    @foreach (var result in Model)
+    {
+        var m = result.Market;
+        int total = result.Products.Count;
+        <section class="card-box search-market">
+            <div class="search-market-head">
+                @if (!string.IsNullOrEmpty(m.ImageUrl))
+                {
+                    <img class="search-market-img" src="@m.ImageUrl" alt="@m.MarketName" loading="lazy" />
+                }
+                <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:4px">
+                    <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <a class="plain-link" style="font-size:19px;font-weight:800" asp-action="Products" asp-route-marketId="@m.MarketId">@m.MarketName</a>
+                        @if (selectedMarketId == m.MarketId)
+                        {
+                            <span class="badge-ml badge-green" style="height:26px;font-size:13px">@IconHelper.Icon("star", 14, true) Current</span>
+                        }
+                        @if (result.DistanceKm != null)
+                        {
+                            <span class="distance">@IconHelper.Icon("pin", 16) @ShopHelper.Distance(result.DistanceKm)</span>
+                        }
+                    </span>
+                    <span class="muted">@(m.District != null ? m.District.DistrictName : "")@(m.District != null && m.District.City != null ? ", " + m.District.City.CityName : "") · @IconHelper.Icon("calendar", 16) @ShopHelper.DayNames(m.OpenDays) · @ShopHelper.Hours(m.OpenTime, m.CloseTime)</span>
+                    <a class="muted plain-link" style="align-self:flex-start" href="@ShopHelper.MarketDirections(m)" target="_blank" rel="noopener" title="Get directions">@IconHelper.Icon("pin", 16) @ShopHelper.MarketAddress(m)</a>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+                    <span class="sched-pay">@total @(total == 1 ? "match" : "matches")</span>
+                    <a class="btn-ml outline" style="height:40px;font-size:14px" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">Shop this market ›</a>
+                </div>
+            </div>
+
+            <div class="product-grid">
+                @foreach (var sp in result.Products.Take(maxCards))
+                {
+                    <partial name="_ProductCard" model="sp" />
+                }
+            </div>
+
+            @if (total > maxCards)
+            {
+                <a style="align-self:flex-start;font-size:15px;font-weight:700" asp-action="Products" asp-route-marketId="@m.MarketId" asp-route-keyword="@keyword">See all @total results at this market ›</a>
+            }
+        </section>
+    }
+</div>
+
+<partial name="_Pager" model="pager" />
+
+@section Scripts {
+    @if (keyword != "")
+    {
+        <script>
+            var searchPageUrl = "@Html.Raw(Url.Action("Search", "Shop", new { keyword = keyword }))";
+            var hasLocation = @(hasLocation ? "true" : "false");
+
+            function setLocationStatus(text, isError) {
+                var status = document.getElementById("locationStatus");
+                if (status) {
+                    status.innerText = text;
+                    status.style.color = isError ? "#B71C1C" : "";
+                }
+            }
+
+            function useMyLocation() {
+                if (!navigator.geolocation) {
+                    setLocationStatus("Your browser does not support location.", true);
+                    return;
+                }
+                setLocationStatus("Finding your location...", false);
+            setButtonLoading(document.getElementById("locationButton"), "Finding your location...");
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        try { sessionStorage.removeItem("ml_location_denied"); } catch (e) { }
+                        var lat = position.coords.latitude.toFixed(5);
+                        var lng = position.coords.longitude.toFixed(5);
+                        setButtonLoading(document.getElementById("locationButton"), "Loading nearby markets...");
+                    window.location.href = searchPageUrl + "&lat=" + lat + "&lng=" + lng;
+                    },
+                    function (error) {
+                        try { sessionStorage.setItem("ml_location_denied", "1"); } catch (e) { }
+                    stopButtonLoading(document.getElementById("locationButton"));
+                        setLocationStatus(error.code == 1 ? "Location access was denied. Markets are not sorted by distance." : "Could not get your location.", true);
+                    },
+                    { timeout: 10000, maximumAge: 300000 }
+                );
+            }
+
+            var deniedBefore = false;
+            try { deniedBefore = sessionStorage.getItem("ml_location_denied") == "1"; } catch (e) { }
+            if (!hasLocation && !deniedBefore) {
+                useMyLocation();
+            }
+        </script>
+    }
+}
