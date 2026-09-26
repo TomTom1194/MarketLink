@@ -6,4 +6,5 @@ public interface IFarmerDashboardService
 {
     Task<FarmerDashboardDto> GetDashboardAsync(int farmerId);
     Task<FarmerOrderNotificationsDto> GetOrderNotificationsAsync(int farmerId);
+    Task<List<FarmerProductAlertDto>> GetProductAlertsAsync(int farmerId);
 }

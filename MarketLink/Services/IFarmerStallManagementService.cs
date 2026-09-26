@@ -2,7 +2,7 @@ using MarketLink.Dtos;
 
 namespace MarketLink.Services.Farmer
 {
-    // Khai báo chức năng xem sạp và cập nhật ngày bán
+    // View the stall and update its selling days
     public interface IFarmerStallManagementService
     {
         Task<List<FarmerStallResponseDto>> GetStallsAsync(int farmerId);

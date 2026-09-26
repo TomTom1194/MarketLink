@@ -63,36 +63,6 @@ namespace MarketLink.Services
             }).ToList();
         }
 
-        public async Task<FarmerStatisticsDto> GetFarmerStatisticsAsync(int farmerId)
-        {
-            var farmerOrders = _context.Orders.AsNoTracking()
-                .Where(order => order.Stall != null && order.Stall.FarmerId == farmerId);
-
-            var pending = await farmerOrders.CountAsync(order => order.Status == "placed" || order.Status == "accepted");
-            var revenue = await farmerOrders.Where(order => order.Status == "completed")
-                .Select(order => (decimal?)order.TotalAmount).SumAsync() ?? 0m;
-            var bestSelling = await _context.OrderSnapshots.AsNoTracking()
-                .Where(item => item.Order != null && item.Order.Stall != null &&
-                    item.Order.Stall.FarmerId == farmerId && item.Order.Status == "completed")
-                .GroupBy(item => item.ProductName)
-                .Select(group => new BestSellingProductDto
-                {
-                    ProductName = group.Key,
-                    QuantitySold = group.Sum(item => item.Quantity),
-                    Revenue = group.Sum(item => item.LineTotal)
-                })
-                .OrderByDescending(item => item.QuantitySold)
-                .Take(5)
-                .ToListAsync();
-
-            return new FarmerStatisticsDto
-            {
-                PendingOrders = pending,
-                Revenue = revenue,
-                BestSellingProducts = bestSelling
-            };
-        }
-
         public async Task<OrderDetailDto?> GetOrderDetailAsync(int id, int farmerId)
         {
             var order = await _context.Orders
@@ -111,9 +81,11 @@ namespace MarketLink.Services
             var order = await GetTrackedOrderAsync(id, farmerId);
             if (order == null || !IsStatus(order, "placed")) return false;
 
+            // Step 2: stock is taken only when the farmer accepts the order
+            await ReserveStockAsync(order);
             order.Status = "accepted";
             order.AcceptedAt = DateTime.Now;
-            AddCustomerNotification(order, "order_accepted", $"Đơn hàng #{order.OrderCode} đã được xác nhận", "Nông dân đã xác nhận đơn hàng của bạn. Hẹn gặp bạn vào thời gian nhận hàng đã chọn.");
+            AddCustomerNotification(order, "order_accepted", $"Order #{order.OrderCode} was accepted", "The farmer accepted your order. See you at the pickup time you chose.");
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
             return true;
@@ -128,30 +100,11 @@ namespace MarketLink.Services
             var order = await GetTrackedOrderAsync(id, farmerId);
             if (order == null || !IsStatus(order, "placed")) return false;
 
-            await AdjustReservedStockAsync(order, complete: false);
+            // A placed order has not taken any stock yet, so nothing to give back
             order.Status = "rejected";
             order.RejectReason = reason;
             order.RejectedAt = DateTime.Now;
-            AddCustomerNotification(order, "order_rejected", $"Đơn hàng #{order.OrderCode} đã bị từ chối", $"Lý do: {reason}");
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return true;
-        }
-
-        public async Task<bool> CancelFarmerOrderAsync(int id, int farmerId, string reason)
-        {
-            reason = reason?.Trim() ?? string.Empty;
-            if (reason.Length == 0 || reason.Length > 500) return false;
-
-            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-            var order = await GetTrackedOrderAsync(id, farmerId);
-            if (order == null || !(IsStatus(order, "placed") || IsStatus(order, "accepted"))) return false;
-
-            await AdjustReservedStockAsync(order, complete: false);
-            order.Status = "cancelled";
-            order.CancelReason = reason;
-            order.CancelledAt = DateTime.Now;
-            AddCustomerNotification(order, "order_cancelled", $"Đơn hàng #{order.OrderCode} đã bị hủy", $"Lý do: {reason}");
+            AddCustomerNotification(order, "order_rejected", $"Order #{order.OrderCode} was rejected", $"Reason: {reason}");
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
             return true;
@@ -163,11 +116,36 @@ namespace MarketLink.Services
             var order = await GetTrackedOrderAsync(id, farmerId);
             if (order == null || !IsStatus(order, "accepted")) return false;
 
-            await AdjustReservedStockAsync(order, complete: true);
+            // Step 3: the customer picked up the products, so the reserved quantity is now sold
+            await MarkStockSoldAsync(order);
             order.Status = "completed";
             order.CompletedAt = DateTime.Now;
             order.CompletedBy = farmerId;
-            AddCustomerNotification(order, "order_completed", $"Đơn hàng #{order.OrderCode} đã hoàn thành", "Nông dân đã xác nhận bạn nhận đủ sản phẩm.");
+            AddCustomerNotification(order, "order_completed", $"Order #{order.OrderCode} is complete", "The farmer confirmed that you picked up all the products.");
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+
+        // The customer did not come: close the order and put the reserved quantity back on sale.
+        public async Task<bool> MarkNoShowAsync(int id, int farmerId)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var order = await GetTrackedOrderAsync(id, farmerId);
+            if (order == null || !IsStatus(order, "accepted")) return false;
+
+            // Only after the pickup time is over
+            if (DateTime.Now < order.PickupDate.Date.Add(order.PickupTo))
+            {
+                throw new InvalidOperationException("You can mark a no-show only after the pickup time is over.");
+            }
+
+            await ReleaseStockAsync(order);
+            order.Status = "no_show";
+
+            // The Notifications table only allows a few types, so "order_cancelled" is used for this message
+            AddCustomerNotification(order, "order_cancelled", $"Order #{order.OrderCode} was not picked up",
+                "You did not come to pick up this order, so the farmer closed it and the products went back on sale.");
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
             return true;
@@ -178,27 +156,62 @@ namespace MarketLink.Services
             .Include(o => o.Items)
             .FirstOrDefaultAsync();
 
-        private async Task AdjustReservedStockAsync(Order order, bool complete)
+        // Step 2 (accept): move the ordered quantity into quantity_reserved,
+        // so it is no longer available to other customers.
+        private async Task ReserveStockAsync(Order order)
         {
-            var quantities = order.Items
-                .GroupBy(item => item.StockPriceId)
-                .Select(group => new { StockPriceId = group.Key, Quantity = group.Sum(item => item.Quantity) })
-                .ToList();
-
-            var stockIds = quantities.Select(x => x.StockPriceId).ToList();
-            var stockRows = await _context.StockPrices
-                .Where(stock => stockIds.Contains(stock.StockPriceId))
-                .ToDictionaryAsync(stock => stock.StockPriceId);
-
-            foreach (var line in quantities)
+            foreach (var item in order.Items)
             {
-                if (!stockRows.TryGetValue(line.StockPriceId, out var stock) || stock.QuantityReserved < line.Quantity)
+                // The price row saved with the order may have been closed since
+                // (the farmer changed the price). Then use the row that is on sale now.
+                var stock = await _context.StockPrices.FirstOrDefaultAsync(sp => sp.StockPriceId == item.StockPriceId);
+                if (stock == null || stock.EffectiveTo != null)
                 {
-                    throw new InvalidOperationException($"Không đủ số lượng đã giữ để xử lý đơn #{order.OrderCode}. Vui lòng kiểm tra lại tồn kho.");
+                    stock = await _context.StockPrices
+                        .Where(sp => sp.ProductId == item.ProductId && sp.StallId == order.StallId && sp.EffectiveTo == null)
+                        .OrderByDescending(sp => sp.EffectiveFrom)
+                        .FirstOrDefaultAsync();
                 }
 
-                stock.QuantityReserved -= line.Quantity;
-                if (complete) stock.QuantitySold += line.Quantity;
+                if (stock == null || stock.QuantityAvailable < item.Quantity)
+                {
+                    decimal left = stock == null ? 0 : stock.QuantityAvailable;
+                    throw new InvalidOperationException(
+                        $"Not enough stock for {item.ProductName}: the order needs {item.Quantity:0.##} {item.Unit} but only {left:0.##} {item.Unit} are left. Reject the order or re-up the product first.");
+                }
+
+                stock.QuantityReserved += item.Quantity;
+
+                // Remember which row holds the reservation (the price the customer pays does not change)
+                item.StockPriceId = stock.StockPriceId;
+            }
+        }
+
+        // No-show: give the reserved quantity back so other customers can buy it.
+        private async Task ReleaseStockAsync(Order order)
+        {
+            foreach (var item in order.Items)
+            {
+                var stock = await _context.StockPrices.FirstOrDefaultAsync(sp => sp.StockPriceId == item.StockPriceId);
+                if (stock == null) continue;
+
+                stock.QuantityReserved = Math.Max(0, stock.QuantityReserved - item.Quantity);
+            }
+        }
+
+        // Step 3 (confirm pickup): the reserved quantity becomes sold.
+        private async Task MarkStockSoldAsync(Order order)
+        {
+            foreach (var item in order.Items)
+            {
+                var stock = await _context.StockPrices.FirstOrDefaultAsync(sp => sp.StockPriceId == item.StockPriceId);
+                if (stock == null || stock.QuantityReserved < item.Quantity)
+                {
+                    throw new InvalidOperationException($"Not enough reserved stock to complete order #{order.OrderCode}. Please check your stock.");
+                }
+
+                stock.QuantityReserved -= item.Quantity;
+                stock.QuantitySold += item.Quantity;
             }
         }
 
@@ -230,6 +243,7 @@ namespace MarketLink.Services
                 CustomerPhone = order.PickupPhone,
                 Address = order.Customer?.Address ?? string.Empty,
                 ReceiveDate = order.PickupDate.Date.Add(order.PickupFrom),
+                PickupEnd = order.PickupDate.Date.Add(order.PickupTo),
                 TotalProductAmount = productTotal,
                 ShippingFee = order.TotalAmount - productTotal,
                 TotalAmount = order.TotalAmount,

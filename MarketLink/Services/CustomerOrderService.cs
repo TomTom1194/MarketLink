@@ -195,23 +195,12 @@ namespace MarketLink.Services
 
             using var transaction = await _context.Database.BeginTransactionAsync();
 
+            // Only an order the farmer has not accepted yet can be cancelled.
+            // A placed order has not taken any stock, so there is nothing to give back.
             int cancelledPlaced = await CancelWithStatusAsync(orderId, "placed", cancelReason, cancelledAt);
             if (cancelledPlaced == 0)
             {
-                int cancelledAccepted = await CancelWithStatusAsync(orderId, "accepted", cancelReason, cancelledAt);
-                if (cancelledAccepted == 0)
-                {
-                    return "This order can no longer be cancelled.";
-                }
-
-                foreach (var item in order.Items)
-                {
-                    decimal quantity = item.Quantity;
-                    await _context.StockPrices
-                        .Where(sp => sp.StockPriceId == item.StockPriceId)
-                        .ExecuteUpdateAsync(x => x.SetProperty(sp => sp.QuantityReserved,
-                            sp => sp.QuantityReserved - quantity < 0 ? 0 : sp.QuantityReserved - quantity));
-                }
+                return "The farmer has already accepted this order, so it can no longer be cancelled.";
             }
 
             _context.Notifications.Add(new Notification

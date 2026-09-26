@@ -1,0 +1,32 @@
+@* Current listing summary (price, available, sold), shown at the top of the Edit product page *@
+@model MarketLink.Models.Product
+@{
+    var history = ViewBag.StockHistory as List<MarketLink.Models.StockPrice> ?? new List<MarketLink.Models.StockPrice>();
+    var stall = ViewBag.Stall as FarmerStallResponseDto;
+    var currentStock = history.FirstOrDefault(item => item.EffectiveTo == null);
+    var latestStock = history.FirstOrDefault();
+    var expired = Model.ExpiresAt <= DateTime.Now;
+    var outOfStock = currentStock == null || currentStock.QuantityAvailable <= 0;
+}
+
+
+<div class="mb-3">
+    <h2 class="farmer-page-title h4">Current listing</h2>
+    <p class="farmer-page-subtitle mb-0">Listing expires: @Model.ExpiresAt.ToString("dd/MM/yyyy HH:mm")</p>
+</div>
+
+<section class="farmer-card @(expired ? "border-danger" : "border-success") mb-4 p-3 p-md-4">
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+        @if (expired) { <span class="badge rounded-pill text-bg-danger">Listing expired · Re-up needed</span> }
+        else if (outOfStock && history.Count > 0) { <span class="badge rounded-pill text-bg-warning">Sold out · Re-up needed</span> }
+        else if (history.Count == 0) { <span class="badge rounded-pill text-bg-secondary">No price posted</span> }
+        else { <span class="badge rounded-pill text-bg-success">In stock</span> }
+        <span class="small text-muted">@(currentStock == null ? "No current listing" : $"Updated: {currentStock.EffectiveFrom:dd/MM/yyyy HH:mm}")</span>
+    </div>
+    <h2 class="h6 fw-bold">@(stall?.MarketName ?? "No stall") <span class="text-success">@(stall == null ? "" : $"· Stall {stall.StallCode}")</span></h2>
+    <div class="row g-3 mt-1">
+        <div class="col-4"><div class="small text-muted">Listed price</div><div class="fs-5 fw-bold text-success">@(latestStock == null ? "—" : latestStock.Price.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US")))</div><small class="text-muted">/ @Model.Unit</small></div>
+        <div class="col-4"><div class="small text-muted">Available</div><div class="fs-5 fw-bold">@(currentStock == null ? "—" : currentStock.QuantityAvailable.ToString("N2"))</div><small class="text-muted">@Model.Unit</small></div>
+        <div class="col-4"><div class="small text-muted">Sold this listing</div><div class="fs-5 fw-bold text-primary">@(currentStock == null ? "—" : currentStock.QuantitySold.ToString("N2"))</div><small class="text-muted">@Model.Unit</small></div>
+    </div>
+</section>

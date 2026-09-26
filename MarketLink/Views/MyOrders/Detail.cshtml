@@ -8,7 +8,7 @@
     var stall = Model.Stall!;
     var market = stall.Market!;
     var farmer = stall.Farmer!;
-    bool canCancel = Model.Status == "placed" || Model.Status == "accepted";
+    bool canCancel = Model.Status == "placed"; // once accepted the order cannot be cancelled
     bool wasAccepted = Model.Status == "accepted" || Model.Status == "completed" || Model.Status == "no_show" || Model.AcceptedAt != null;
     string directionsLink = ShopHelper.MapLink(stall, market);
 }
@@ -171,7 +171,7 @@
     <div class="modal-bg" id="cancelDialog" role="dialog" aria-modal="true" aria-labelledby="cancelTitle">
         <form class="modal-box" asp-action="Cancel" asp-route-id="@Model.OrderId" method="post">
             <span id="cancelTitle" style="font-size:19px;font-weight:800">Cancel order @Model.OrderCode?</span>
-            <span class="muted">The farmer will be notified and the items will be released for other customers.</span>
+            <span class="muted">The farmer will be notified. You can only cancel before the farmer accepts the order.</span>
             <div class="field">
                 <label for="reason">Reason (required)</label>
                 <textarea id="reason" name="reason" rows="3" maxlength="500" required placeholder="e.g. I can't come to the market that day"></textarea>

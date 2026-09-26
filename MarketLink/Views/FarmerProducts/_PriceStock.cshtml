@@ -1,0 +1,41 @@
+@* Price & stock history (Stock_Price rows), shown at the bottom of the Edit product page *@
+@model MarketLink.Models.Product
+@{
+    var history = ViewBag.StockHistory as List<MarketLink.Models.StockPrice> ?? new List<MarketLink.Models.StockPrice>();
+    var stall = ViewBag.Stall as FarmerStallResponseDto;
+    var currentStock = history.FirstOrDefault(item => item.EffectiveTo == null);
+    var latestStock = history.FirstOrDefault();
+    var expired = Model.ExpiresAt <= DateTime.Now;
+    var outOfStock = currentStock == null || currentStock.QuantityAvailable <= 0;
+}
+
+
+<style>
+    .farmer-stock-table thead th { background: #dfeee3; color: #24543a; border-bottom: 1px solid #bad9c3; white-space: nowrap; }
+    .farmer-stock-table tbody tr:nth-child(even) > * { background: #f4faf5; }
+    .farmer-stock-table tbody tr:hover > * { background: #eaf5ec; }
+</style>
+
+<section class="farmer-card overflow-hidden">
+    <div class="border-bottom p-3"><h2 class="farmer-card-title">Price and stock history</h2></div>
+    <div class="table-responsive">
+        <table class="table table-hover farmer-stock-table align-middle mb-0 small">
+            <thead class="table-light"><tr><th>Time</th><th>Price</th><th>Added</th><th>Reserved</th><th>Sold</th><th>Change type</th><th>Status</th></tr></thead>
+            <tbody>
+                @if (history.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">No price or stock history yet.</td></tr> }
+                @foreach (var item in history)
+                {
+                    <tr>
+                        <td>@item.EffectiveFrom.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@item.Price.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"))</td>
+                        <td>@item.QuantityIn.ToString("N2") @Model.Unit</td>
+                        <td>@item.QuantityReserved.ToString("N2") @Model.Unit</td>
+                        <td>@item.QuantitySold.ToString("N2") @Model.Unit</td>
+                        <td>@(item.ChangeType == "new" ? "Initial price" : item.ChangeType == "price_change" ? "Price change" : "Restock / re-up")</td>
+                        <td>@(item.EffectiveTo == null ? "Current" : "Closed")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

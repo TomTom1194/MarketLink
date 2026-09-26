@@ -1,6 +1,6 @@
 namespace MarketLink.Dtos
 {
-    // Thông tin sạp thuộc farmer đang đăng nhập
+    // A stall that belongs to the logged-in farmer
     public class FarmerStallResponseDto
     {
         public int StallId { get; set; }

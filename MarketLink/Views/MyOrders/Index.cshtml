@@ -76,7 +76,7 @@ else
 
                 <div class="bottom">
                     <span style="flex:1"></span>
-                    @if (o.Status == "placed" || o.Status == "accepted")
+                    @if (o.Status == "placed")
                     {
                         <a class="btn-ml danger" style="height:40px;font-size:14px" asp-action="Detail" asp-route-id="@o.OrderId" asp-fragment="cancel">Cancel</a>
                     }

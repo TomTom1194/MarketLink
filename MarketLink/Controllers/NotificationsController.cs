@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using MarketLink.Services;
+using MarketLink.Services.Farmer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,10 +10,12 @@ namespace MarketLink.Controllers
     public class NotificationsController : Controller
     {
         private readonly INotificationService _notificationService;
+        private readonly IFarmerDashboardService _dashboardService;
 
-        public NotificationsController(INotificationService notificationService)
+        public NotificationsController(INotificationService notificationService, IFarmerDashboardService dashboardService)
         {
             _notificationService = notificationService;
+            _dashboardService = dashboardService;
         }
 
         public async Task<IActionResult> Index()
@@ -20,7 +23,11 @@ namespace MarketLink.Controllers
             if (!TryGetUserId(out var userId)) return Forbid();
             var notifications = await _notificationService.GetForUserAsync(userId);
             ViewBag.UnreadCount = notifications.Count(notification => !notification.IsRead);
-            if (User.IsInRole("farmer")) ViewData["FarmerSection"] = "notifications";
+
+            // Farmers: products that sold out or expired and need a re-up
+            ViewBag.ProductAlerts = User.IsInRole("farmer")
+                ? await _dashboardService.GetProductAlertsAsync(userId)
+                : new List<MarketLink.Dtos.FarmerProductAlertDto>();
             return View(notifications);
         }
 

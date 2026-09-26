@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace MarketLink.Dtos
 {
-    // Validate ở server để xử lý đúng chữ hoa tiếng Việt.
+    // Checked on the server so Vietnamese capital letters are handled correctly.
     public class ValidProductNameAttribute : ValidationAttribute
     {
         private static readonly Regex NamePattern = new(@"^\p{Lu}[\p{L}\p{M}\p{N}]*(?:[ '-][\p{L}\p{M}\p{N}]+)*$", RegexOptions.Compiled);

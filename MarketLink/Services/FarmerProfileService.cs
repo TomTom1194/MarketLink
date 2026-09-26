@@ -12,13 +12,13 @@ namespace MarketLink.Services
         {
             _ctx = ctx;
         }
-        // Lấy hồ sơ kèm phường/xã và tỉnh/thành để hiển thị lên form.
+        // Load the profile with its district and city to show on the form.
         public async Task<FarmerProfile?> GetFarmerProfileAsync(int farmerId)
         {
             return await _ctx.FarmerProfiles.Include(profile => profile.District).ThenInclude(district => district!.City).FirstOrDefaultAsync(profile => profile.FarmerId == farmerId);
         }
 
-        // Kiểm tra hồ sơ và quan hệ tỉnh/thành - phường/xã.
+        // Check the profile and that the district belongs to the city.
         public async Task<Dictionary<string, string>> ValidateUpdateAsync(int farmerId,UpdateFarmerProfileDto model)
         {
             var errors = new Dictionary<string, string>();
@@ -48,7 +48,7 @@ namespace MarketLink.Services
             return errors;
         }
 
-        // Chỉ cập nhật thông tin hồ sơ farmer; không sửa trạng thái duyệt.
+        // Only updates the profile details; the approval status is not changed.
         public async Task UpdateProfileAsync(int farmerId,UpdateFarmerProfileDto model)
         {
             var profile = await _ctx.FarmerProfiles.FirstOrDefaultAsync(i => i.FarmerId == farmerId);

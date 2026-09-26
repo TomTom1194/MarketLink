@@ -1,6 +1,6 @@
 @model List<MarketLink.Models.Product>
 @{
-    ViewData["Title"] = "Products & kho";
+    ViewData["Title"] = "Products & stock";
     Layout = "~/Views/Shared/_FarmerLayout.cshtml";
     var currentTime = DateTime.Now;
     var activeCount = Model.Count(product => product.Status == "active" && product.ExpiresAt > currentTime);
@@ -11,8 +11,7 @@
     .farmer-product-table thead th { background: #dfeee3; color: #24543a; border-bottom: 1px solid #bad9c3; white-space: nowrap; }
     .farmer-product-table tbody tr:nth-child(even) > * { background: #f4faf5; }
     .farmer-product-table tbody tr:hover > * { background: #eaf5ec; }
-    .farmer-product-table tbody tr.product-expired > * { background: #fff1f2; }
-    .farmer-product-table tbody tr.product-expired:hover > * { background: #ffe4e6; }
+    
 </style>
 
 <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
@@ -44,18 +43,21 @@
                 {
                     var expired = product.ExpiresAt <= currentTime;
                     var hasStock = product.StockPrices.Any(stock => stock.QuantityAvailable > 0);
+                    var hasPrice = product.StockPrices.Any();
+                    var soldOut = hasPrice && !hasStock;
                     <tr class="@(expired ? "product-expired" : "")">
                         <td><img src="@product.ImageUrl" alt="@product.ProductName" class="rounded-3 border @(expired ? "border-danger" : "")" style="width:48px;height:48px;object-fit:cover" /></td>
                         <td>
                             <div class="fw-semibold @(expired ? "text-danger" : "")">@product.ProductName</div>
                             <small class="text-muted">Listed: @product.PublishedAt.ToString("dd/MM/yyyy HH:mm")</small>
-                            @if (expired) { <div class="small text-danger fw-semibold mt-1">Listing expired. Re-up to extend it.</div> }
+                            
                         </td>
                         <td>@product.Category?.CategoryName</td>
                         <td>@product.Unit</td>
                         <td>
                             @if (expired) { <span class="badge text-bg-danger">Listing expired · Re-up needed</span> }
-                            else if (!hasStock) { <span class="badge text-bg-warning">Out of stock · hidden</span> }
+                            else if (!hasPrice) { <span class="badge text-bg-secondary">No price yet</span> }
+                            else if (soldOut) { <span class="badge text-bg-warning">Sold out · re-up needed</span> }
                             else if (product.Status == "hidden") { <span class="badge text-bg-secondary">Hidden</span> }
                             else { <span class="badge text-bg-success">Visible</span> }
                         </td>
@@ -63,8 +65,7 @@
                         <td>
                             <div class="d-flex flex-wrap gap-1">
                                 <a asp-action="Edit" asp-route-id="@product.ProductId" class="btn btn-sm btn-outline-primary">Edit</a>
-                                <a asp-action="Stock" asp-route-id="@product.ProductId" class="btn btn-sm btn-outline-info">Price & stock</a>
-                                <a asp-action="Stock" asp-route-id="@product.ProductId" asp-fragment="reup" class="btn btn-sm @(expired ? "btn-danger" : "btn-outline-success")">@(expired ? "Re-up now" : "Re-up")</a>
+                                @if (expired || soldOut) { <a asp-action="Reup" asp-route-id="@product.ProductId" class="btn btn-sm btn-danger">Re-up now</a> }
                                 <form asp-action="UpdateStatus" method="post">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="ProductId" value="@product.ProductId" />

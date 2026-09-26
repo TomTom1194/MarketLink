@@ -1,3 +1,4 @@
 @{
-    Layout = "_OrderWorkflowLayout";
+    // Farmers read notifications in the farmer portal, customers in their account pages
+    Layout = User.IsInRole("farmer") ? "_FarmerLayout" : "_AccountLayout";
 }

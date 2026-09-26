@@ -22,5 +22,8 @@ namespace MarketLink.Services
         Task SignInAsync(HttpContext httpContext, User user, bool rememberMe);
 
         Task SignOutAsync(HttpContext httpContext);
+
+        // Returns "" when the password was changed, otherwise an error message
+        Task<string> ChangePasswordAsync(int userId, string currentPassword, string newPassword);
     }
 }

@@ -14,6 +14,9 @@
 
         public DateTime ReceiveDate { get; set; }
 
+        // End of the pickup time slot (a no-show can be marked after this)
+        public DateTime PickupEnd { get; set; }
+
         public decimal TotalProductAmount { get; set; }
 
         public decimal ShippingFee { get; set; }

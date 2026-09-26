@@ -36,6 +36,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/css/shop.css" asp-append-version="true" />
+    @if (ViewContext.RouteData.Values["controller"]?.ToString() == "Notifications")
+    {
+        @* Cards and tabs of the notifications page *@
+        <link rel="stylesheet" href="~/css/farmer-orders.css" asp-append-version="true" />
+    }
 </head>
 <body class="shop">
 <header class="ml-header">

@@ -233,6 +233,13 @@ CREATE TABLE Notifications (
     created_at       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     read_at          DATETIME2 NULL
 );
+
+-- Units a farmer can choose on the product form
+CREATE TABLE Product_Unit (
+    unit        NVARCHAR(20) NOT NULL PRIMARY KEY,   -- e.g. kg, bunch, box
+    sort_order  INT          NOT NULL,               -- order in the dropdown
+    is_active   BIT          NOT NULL DEFAULT 1      -- 0 = hidden from the dropdown
+);
 GO
 
 /* =====================================================================
@@ -241,6 +248,12 @@ GO
 
 -- Roles: required for sign-up and permissions
 INSERT INTO Role (role_name) VALUES ('customer'), ('farmer'), ('admin');
+
+-- Product units for the farmer product form
+INSERT INTO Product_Unit (unit, sort_order) VALUES
+    (N'kg', 1), (N'g', 2), (N'liter', 3), (N'ml', 4),
+    (N'bunch', 5), (N'piece', 6), (N'head', 7), (N'dozen', 8),
+    (N'bag', 9), (N'box', 10), (N'tray', 11), (N'carton', 12);
 
 -- Admin account: email admin@marketlink.vn / password admin@123
 -- password_hash is a BCrypt hash (same format as BCrypt.Net-Next); check it with BCrypt.Net.BCrypt.Verify

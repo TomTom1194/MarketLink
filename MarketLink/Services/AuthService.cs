@@ -118,5 +118,29 @@ namespace MarketLink.Services
         {
             await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         }
+
+        public async Task<string> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+            if (user == null)
+            {
+                return "Account not found.";
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+            {
+                return "Your current password is incorrect.";
+            }
+
+            if (BCrypt.Net.BCrypt.Verify(newPassword, user.PasswordHash))
+            {
+                return "The new password must be different from the current one.";
+            }
+
+            user.PasswordHash = HashPassword(newPassword);
+            user.UpdatedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return "";
+        }
     }
 }

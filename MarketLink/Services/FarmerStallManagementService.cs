@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MarketLink.Services.Farmer
 {
-    // Quản lý các sạp thuộc farmer đang đăng nhập
+    // Manages the stalls of the logged-in farmer
     public class FarmerStallManagementService : IFarmerStallManagementService
     {
         private readonly MarketLinkDbContext _context;
@@ -14,7 +14,7 @@ namespace MarketLink.Services.Farmer
             _context = context;
         }
 
-        // Lấy danh sách sạp và thông tin chợ từ DB
+        // Load the stalls and their markets from the database
         public async Task<List<FarmerStallResponseDto>> GetStallsAsync(int farmerId)
         {
             return await _context.Stalls
@@ -37,13 +37,13 @@ namespace MarketLink.Services.Farmer
                 .ToListAsync();
         }
 
-        // Chỉ cập nhật ngày bán, đồng thời xác nhận sạp thuộc farmer hiện tại
+        // Only updates the selling days, after checking the stall belongs to this farmer
         public async Task<FarmerStallResponseDto?> UpdateSellingDaysAsync(
             int farmerId,
             int stallId,
             UpdateStallSellingDaysDto model)
         {
-            // Farmer chỉ được quản lý một sạp; không nhận ID của sạp phụ nếu dữ liệu cũ bị trùng.
+            // A farmer manages only one stall; IDs of extra stalls from old duplicate data are ignored.
             var stall = await _context.Stalls
                 .Where(item => item.FarmerId == farmerId)
                 .OrderByDescending(item => item.IsActive)

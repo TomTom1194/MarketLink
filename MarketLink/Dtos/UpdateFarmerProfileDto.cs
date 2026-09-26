@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MarketLink.Dtos
 {
-    // Dữ liệu farmer được phép cập nhật trong hồ sơ
+    // Profile fields a farmer is allowed to update
     public class UpdateFarmerProfileDto
     {
         [Required(ErrorMessage = "Enter a farm name")]
@@ -19,7 +19,7 @@ namespace MarketLink.Dtos
         [StringLength(255, ErrorMessage = "Address must be 255 characters or fewer")]
         public string Address { get; set; } = "";
 
-        // Chỉ dùng để kiểm tra/lọc; Farmer_Profile lưu DistrictId.
+        // Only used to check / filter; Farmer_Profile stores DistrictId.
         [Required(ErrorMessage = "Select a province or city")]
         public int? CityId { get; set; }
 
