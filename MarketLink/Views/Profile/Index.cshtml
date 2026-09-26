@@ -1,0 +1,83 @@
+@model ProfileDto
+@{
+    ViewData["Title"] = "Profile";
+    ViewData["AccountMenu"] = "profile";
+    Layout = "_AccountLayout";
+}
+
+<h1 class="title">Profile</h1>
+
+<form asp-action="Index" method="post" class="card-box profile-form" novalidate>
+    <div asp-validation-summary="ModelOnly" class="alert-ml err"></div>
+
+    <span style="font-size:18px;font-weight:800">Personal details</span>
+
+    <div class="profile-grid">
+        <div class="field">
+            <label asp-for="FullName"></label>
+            <input asp-for="FullName" autocomplete="name" />
+            <span asp-validation-for="FullName" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Phone"></label>
+            <input asp-for="Phone" autocomplete="tel" placeholder="e.g. 0901234567" />
+            <span asp-validation-for="Phone" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label for="email">Email</label>
+            <input id="email" value="@ViewBag.Email" disabled />
+            <span class="muted" style="font-size:13px">Email is used to log in and cannot be changed.</span>
+        </div>
+    </div>
+
+    <span style="font-size:18px;font-weight:800;margin-top:6px">Address</span>
+    <span class="muted" style="margin-top:-8px">Used to suggest markets near you. We don't deliver.</span>
+
+    <div class="profile-grid">
+        <div class="field">
+            <label asp-for="CityId"></label>
+            <select asp-for="CityId" asp-items="ViewBag.Cities" onchange="loadDistricts(this.value)">
+                <option value="">-- Choose a city --</option>
+            </select>
+            <span asp-validation-for="CityId" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="DistrictId"></label>
+            <select asp-for="DistrictId" asp-items="ViewBag.Districts">
+                <option value="">-- Choose a district --</option>
+            </select>
+            <span asp-validation-for="DistrictId" class="field-error"></span>
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+            <label asp-for="Address"></label>
+            <input asp-for="Address" autocomplete="street-address" placeholder="House number, street, ward" />
+            <span asp-validation-for="Address" class="field-error"></span>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;border-top:1px solid #EEF1EF;padding-top:14px">
+        <a class="btn-ml grey" asp-action="Index">Cancel</a>
+        <button type="submit" class="btn-ml" style="min-width:160px">Save changes</button>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        function loadDistricts(cityId) {
+            var districtSelect = document.getElementById("DistrictId");
+            districtSelect.innerHTML = "<option value=''>-- Choose a district --</option>";
+            if (cityId == "") return;
+
+            fetch("@Url.Action("GetDistricts", "Shop")?cityId=" + cityId)
+                .then(function (response) { return response.json(); })
+                .then(function (districts) {
+                    for (var i = 0; i < districts.length; i++) {
+                        var option = document.createElement("option");
+                        option.value = districts[i].districtId;
+                        option.text = districts[i].districtName;
+                        districtSelect.appendChild(option);
+                    }
+                });
+        }
+    </script>
+}

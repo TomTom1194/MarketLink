@@ -27,6 +27,8 @@
         <Folder Include="Controllers\" />
         <Folder Include="Dtos\" />
         <Folder Include="Services\" />
+        <Folder Include="wwwroot\images\markets\" />
+        <Folder Include="wwwroot\images\products\" />
     </ItemGroup>
 
 </Project>

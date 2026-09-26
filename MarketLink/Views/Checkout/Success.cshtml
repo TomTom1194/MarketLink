@@ -1,0 +1,46 @@
+@model List<Order>
+@using MarketLink.Helpers
+@{
+    ViewData["Title"] = "Reservation confirmed";
+    Layout = "_ShopLayout";
+}
+
+<div style="max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+    <div class="card-box" style="padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center">
+        <span style="width:76px;height:76px;border-radius:50%;background:#0B7A3E;display:grid;place-items:center">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"></path></svg>
+        </span>
+        <span style="font-size:24px;font-weight:800">Reservation confirmed</span>
+        <span class="muted" style="font-size:15px;max-width:460px">You placed @Model.Count order(s). Show your order code at each stall and pay the farmer in person.</span>
+    </div>
+
+    @foreach (var o in Model)
+    {
+        var stall = o.Stall!;
+        var market = stall.Market!;
+        <div class="order-card">
+            <div class="top" style="justify-content:space-between">
+                <span style="display:flex;flex-direction:column;gap:2px">
+                    <span class="muted">Order code</span>
+                    <span class="code">@o.OrderCode</span>
+                </span>
+                <span class="badge-ml @ShopHelper.StatusClass(o.Status)">@IconHelper.Icon("dot", 10, true) @ShopHelper.StatusText(o.Status)</span>
+            </div>
+            <div class="info-grid">
+                <div><span class="k">Farmer</span><span class="v">@stall.Farmer!.BrandName</span></div>
+                <div><span class="k">Market</span><span class="v">@market.MarketName · Stall @stall.StallCode</span></div>
+                <div><span class="k">Pickup</span><span class="v">@o.PickupDate.ToString("dddd, dd/MM/yyyy") · @ShopHelper.Hours(o.PickupFrom, o.PickupTo)</span></div>
+                <div><span class="k">Pay at the stall</span><span class="v" style="color:#E53935">@ShopHelper.Money(o.TotalAmount)</span></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <a class="btn-ml" href="@ShopHelper.MapLink(stall, market)" target="_blank">@IconHelper.Icon("pin") Get directions</a>
+                <a class="btn-ml outline" asp-controller="MyOrders" asp-action="Detail" asp-route-id="@o.OrderId">Order details</a>
+            </div>
+        </div>
+    }
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <a class="btn-ml soft" asp-controller="MyOrders" asp-action="Index">View my orders</a>
+        <a class="btn-ml grey" asp-controller="Shop" asp-action="Products">Continue shopping</a>
+    </div>
+</div>

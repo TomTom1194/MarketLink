@@ -1,0 +1,95 @@
+@model List<Order>
+@using MarketLink.Helpers
+@{
+    ViewData["Title"] = "My orders";
+    ViewData["AccountMenu"] = "orders";
+    Layout = "_AccountLayout";
+    string? status = ViewBag.Status;
+}
+
+<h1 class="title">My orders</h1>
+
+<nav class="tabs" aria-label="Filter orders">
+    <a class="@(string.IsNullOrEmpty(status) ? "on" : "")" asp-action="Index">All</a>
+    <a class="@(status == "placed" ? "on" : "")" asp-action="Index" asp-route-status="placed">Waiting for farmer</a>
+    <a class="@(status == "accepted" ? "on" : "")" asp-action="Index" asp-route-status="accepted">Ready for pickup</a>
+    <a class="@(status == "completed" ? "on" : "")" asp-action="Index" asp-route-status="completed">Picked up</a>
+    <a class="@(status == "cancelled" ? "on" : "")" asp-action="Index" asp-route-status="cancelled">Cancelled</a>
+    <a class="@(status == "rejected" ? "on" : "")" asp-action="Index" asp-route-status="rejected">Rejected</a>
+</nav>
+
+@if (Model.Count == 0)
+{
+    <div class="empty">
+        <span class="icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>
+        </span>
+        <span class="t">No orders here</span>
+        <span class="d">Reserve from a farmer and your orders will appear here.</span>
+        <a class="btn-ml" asp-controller="Shop" asp-action="Products">Browse products</a>
+    </div>
+}
+else
+{
+    <div style="display:flex;flex-direction:column;gap:12px">
+        @foreach (var o in Model)
+        {
+            var stall = o.Stall!;
+            int step = 1;
+            if (o.Status == "accepted") step = 2;
+            if (o.Status == "completed") step = 3;
+            bool isClosed = o.Status == "cancelled" || o.Status == "rejected" || o.Status == "no_show";
+
+            <div class="order-card">
+                <div class="top">
+                    <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px">
+                        <span class="muted">Order <strong style="color:#1F2421;letter-spacing:0.03em">@o.OrderCode</strong></span>
+                        <span style="font-size:17px;font-weight:700">@stall.Farmer!.BrandName</span>
+                        <span class="muted">@stall.Market!.MarketName · Stall @stall.StallCode · @o.PickupDate.ToString("ddd dd/MM") · @ShopHelper.Hours(o.PickupFrom, o.PickupTo)</span>
+                    </span>
+                    <span class="badge-ml @ShopHelper.StatusClass(o.Status)">@ShopHelper.StatusText(o.Status)</span>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    @{ int count = 0; }
+                    @foreach (var it in o.Items)
+                    {
+                        count++;
+                        if (count <= 4)
+                        {
+                            <img class="thumb sm" src="@it.ImageUrl" alt="@it.ProductName" title="@it.ProductName" />
+                        }
+                    }
+                    <span class="muted">@o.Items.Count item(s)</span>
+                    <span style="margin-left:auto;font-size:15px">Total <strong style="font-size:18px;color:#E53935">@ShopHelper.Money(o.TotalAmount)</strong></span>
+                </div>
+
+                @if (!isClosed)
+                {
+                    <ol class="steps" aria-label="Order status">
+                        <li class="done"><span class="dot">1</span>Placed</li>
+                        <li class="@(step >= 2 ? "done" : "")"><span class="bar"></span><span class="dot">2</span>Accepted</li>
+                        <li class="@(step >= 3 ? "done" : "")"><span class="bar"></span><span class="dot">3</span>Picked up</li>
+                    </ol>
+                }
+                else if (o.Status == "cancelled")
+                {
+                    <span class="muted">@IconHelper.Icon("x", 16) Cancelled: @o.CancelReason</span>
+                }
+                else if (o.Status == "rejected")
+                {
+                    <span class="muted">@IconHelper.Icon("x", 16) Rejected by farmer: @o.RejectReason</span>
+                }
+
+                <div class="bottom">
+                    <span style="flex:1"></span>
+                    @if (o.Status == "placed" || o.Status == "accepted")
+                    {
+                        <a class="btn-ml danger" style="height:40px;font-size:14px" asp-action="Detail" asp-route-id="@o.OrderId" asp-fragment="cancel">Cancel</a>
+                    }
+                    <a class="btn-ml outline" style="height:40px;font-size:14px" asp-action="Detail" asp-route-id="@o.OrderId">Details ›</a>
+                </div>
+            </div>
+        }
+    </div>
+}

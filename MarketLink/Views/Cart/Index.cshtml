@@ -1,0 +1,267 @@
+@model Cart?
+@using MarketLink.Helpers
+@{
+    ViewData["Title"] = "Your basket";
+    Layout = "_ShopLayout";
+
+    List<Cart> allCarts = ViewBag.AllCarts;
+    Dictionary<int, DateTime?> pickupDates = ViewBag.PickupDates ?? new Dictionary<int, DateTime?>();
+    CheckoutDto? checkoutForm = ViewBag.CheckoutForm;
+    List<string> cartNotices = ViewBag.CartNotices ?? new List<string>();
+
+    var itemsByStall = new Dictionary<int, List<CartItem>>();
+    var okItemsByStall = new Dictionary<int, List<CartItem>>();
+    decimal totalAmount = 0;
+    int itemCount = 0;
+    int skippedCount = 0;
+
+    if (Model != null)
+    {
+        foreach (var item in Model.Items)
+        {
+            int stallId = item.StockPrice!.StallId;
+            if (!itemsByStall.ContainsKey(stallId))
+            {
+                itemsByStall[stallId] = new List<CartItem>();
+            }
+            itemsByStall[stallId].Add(item);
+            itemCount++;
+
+            if (ShopHelper.ItemStatus(item.StockPrice) == "ok")
+            {
+                if (!okItemsByStall.ContainsKey(stallId))
+                {
+                    okItemsByStall[stallId] = new List<CartItem>();
+                }
+                okItemsByStall[stallId].Add(item);
+                totalAmount = totalAmount + item.StockPrice.Price * item.Quantity;
+            }
+            else
+            {
+                skippedCount++;
+            }
+        }
+    }
+    bool nothingToOrder = okItemsByStall.Count == 0;
+}
+
+@if (Model == null || Model.Items.Count == 0)
+{
+    <div class="empty">
+        <span class="icon">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2 9.2a2 2 0 0 1-2 1.8H7a2 2 0 0 1-2-1.8z"></path><path d="m8 10 4-6 4 6"></path></svg>
+        </span>
+        <span class="t">Your basket is empty</span>
+        <span class="d">Reserve fresh produce from farmers at your local market.</span>
+        <a class="btn-ml" asp-controller="Shop" asp-action="Products">Browse products</a>
+    </div>
+}
+else
+{
+    <div>
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+            <h1 class="title">Your basket</h1>
+            <span class="muted" style="font-size:15px">@itemCount items · @Model.Market!.MarketName · grouped by farmer</span>
+        </div>
+        <div class="muted" style="display:flex;gap:6px 16px;flex-wrap:wrap">
+            <span><strong style="color:#0B7A3E">1</strong> Check items</span><span>›</span>
+            <span><strong style="color:#0B7A3E">2</strong> Pickup day is pre-selected</span><span>›</span>
+            <span><strong style="color:#0B7A3E">3</strong> Confirm</span>
+        </div>
+    </div>
+
+    @if (cartNotices.Count > 0)
+    {
+        <div class="alert-ml warn-box" role="status">
+            @IconHelper.Icon("bell", 20)
+            <span style="display:flex;flex-direction:column;gap:4px">
+                <strong>Your basket was updated because some items changed:</strong>
+                @foreach (string notice in cartNotices)
+                {
+                    <span style="font-weight:500">• @notice</span>
+                }
+            </span>
+        </div>
+    }
+
+    @if (allCarts.Count > 1)
+    {
+        <div class="cart-tabs">
+            <span class="muted" style="align-self:center">You have baskets at:</span>
+            @foreach (var c in allCarts)
+            {
+                <a class="chip @(c.MarketId == Model.MarketId ? "on" : "")" asp-action="Index" asp-route-marketId="@c.MarketId">@c.Market!.MarketName (@c.Items.Count)</a>
+            }
+        </div>
+    }
+
+    <div class="basket-layout">
+        <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+            @{ int orderNumber = 0; }
+            @foreach (int stallId in itemsByStall.Keys)
+            {
+                var items = itemsByStall[stallId];
+                var stall = items[0].StockPrice!.Stall!;
+                bool groupHasOrder = okItemsByStall.ContainsKey(stallId);
+                if (groupHasOrder)
+                {
+                    orderNumber++;
+                }
+                decimal subtotal = 0;
+                if (groupHasOrder)
+                {
+                    foreach (var it in okItemsByStall[stallId])
+                    {
+                        subtotal = subtotal + it.StockPrice!.Price * it.Quantity;
+                    }
+                }
+                DateTime? pickupDate = pickupDates.ContainsKey(stallId) ? pickupDates[stallId] : null;
+
+                <div class="group">
+                    <div class="group-head">
+                        <span class="group-icon">@IconHelper.Icon("store", 20)</span>
+                        <span style="display:flex;flex-direction:column;flex:1;min-width:0">
+                            <span style="font-size:16px;font-weight:700">@stall.Farmer!.BrandName</span>
+                            <span class="muted">@Model.Market.MarketName · Stall @stall.StallCode</span>
+                        </span>
+                        @if (groupHasOrder)
+                        {
+                            <span class="muted" style="font-weight:600">Order @orderNumber of @okItemsByStall.Count</span>
+                        }
+                        else
+                        {
+                            <span class="muted" style="font-weight:600">Nothing to order here</span>
+                        }
+                    </div>
+
+                    @foreach (var it in items)
+                    {
+                        var sp = it.StockPrice!;
+                        string status = ShopHelper.ItemStatus(sp);
+                        bool canOrder = status == "ok";
+
+                        <div class="line-item @(canOrder ? "" : "off")">
+                            <img class="thumb" src="@sp.Product!.ImageUrl" alt="" />
+                            <span class="info">
+                                <a asp-controller="Shop" asp-action="Detail" asp-route-id="@sp.StockPriceId" style="font-size:15px;font-weight:600;color:#1F2421;text-decoration:none">@sp.Product.ProductName</a>
+                                <span class="muted">per @sp.Product.Unit · <span style="color:#E53935;font-weight:700">@ShopHelper.Money(sp.Price)</span></span>
+                                @if (status == "sold_out")
+                                {
+                                    <span class="stock-out">@IconHelper.Icon("x", 16) Sold out – not included in your order</span>
+                                }
+                                else if (status == "unavailable")
+                                {
+                                    <span class="stock-out">@IconHelper.Icon("x", 16) No longer available – not included in your order</span>
+                                }
+                            </span>
+                            <span class="right">
+                                @if (canOrder)
+                                {
+                                    <form asp-action="UpdateQuantity" method="post" class="inline-form">
+                                        <input type="hidden" name="cartItemId" value="@it.CartItemId" />
+                                        <input type="hidden" name="marketId" value="@Model.MarketId" />
+                                        <span class="qty-box sm">
+                                            <button type="submit" name="quantity" value="@ShopHelper.Qty(it.Quantity - 1)" aria-label="Decrease">–</button>
+                                            <span style="min-width:36px;text-align:center;font-size:16px;font-weight:800">@ShopHelper.Qty(it.Quantity)</span>
+                                            <button type="submit" name="quantity" value="@ShopHelper.Qty(it.Quantity + 1)" aria-label="Increase" disabled="@(it.Quantity + 1 > sp.QuantityAvailable)">+</button>
+                                        </span>
+                                    </form>
+                                    <span class="line-total">@ShopHelper.Money(sp.Price * it.Quantity)</span>
+                                }
+                                else
+                                {
+                                    <span class="muted">× @ShopHelper.Qty(it.Quantity)</span>
+                                    <span class="line-total" style="color:#8A948F">–</span>
+                                }
+                                <form asp-action="Remove" method="post" class="inline-form">
+                                    <input type="hidden" name="cartItemId" value="@it.CartItemId" />
+                                    <input type="hidden" name="marketId" value="@Model.MarketId" />
+                                    <button type="submit" class="btn-ml danger" style="height:40px;padding:0 10px;font-size:14px">@IconHelper.Icon("trash", 16) Remove</button>
+                                </form>
+                            </span>
+                        </div>
+                    }
+
+                    @if (groupHasOrder)
+                    {
+                    <div class="group-foot">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px">
+                            @if (pickupDate != null)
+                            {
+                                <strong>Pickup · @pickupDate.Value.ToString("dddd, dd/MM")</strong>
+                            }
+                            else
+                            {
+                                <strong style="color:#B71C1C">No selling day in the next 7 days</strong>
+                            }
+                            <span class="muted">Market open @ShopHelper.Hours(Model.Market.OpenTime, Model.Market.CloseTime)</span>
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:flex-end">
+                            <span style="font-size:15px">Subtotal <strong style="font-size:17px">@ShopHelper.Money(subtotal)</strong></span>
+                        </div>
+                    </div>
+                    }
+                </div>
+            }
+            <a asp-controller="Shop" asp-action="Products" asp-route-marketId="@Model.MarketId" style="align-self:flex-start;font-size:15px;font-weight:700;text-decoration:none">‹ Continue shopping</a>
+        </div>
+
+        <aside class="summary">
+            <span style="font-size:18px;font-weight:800">Reservation summary</span>
+            <span class="muted" style="font-size:15px">@okItemsByStall.Count order(s) – one per farmer</span>
+            @if (skippedCount > 0)
+            {
+                <span class="stock-low">@skippedCount @(skippedCount == 1 ? "item is" : "items are") not available and will not be ordered.</span>
+            }
+
+            <div class="rows">
+                @foreach (int stallId in okItemsByStall.Keys)
+                {
+                    var stall = okItemsByStall[stallId][0].StockPrice!.Stall!;
+                    decimal subtotal = 0;
+                    foreach (var it in okItemsByStall[stallId])
+                    {
+                        subtotal = subtotal + it.StockPrice!.Price * it.Quantity;
+                    }
+                    DateTime? pickupDate = pickupDates.ContainsKey(stallId) ? pickupDates[stallId] : null;
+                    <div class="row-s">
+                        <span style="display:flex;flex-direction:column">
+                            <span style="font-weight:600">@stall.Farmer!.BrandName</span>
+                            <span style="color:#5F6B65">@(pickupDate != null ? pickupDate.Value.ToString("ddd dd/MM") : "–") · Stall @stall.StallCode</span>
+                        </span>
+                        <strong>@ShopHelper.Money(subtotal)</strong>
+                    </div>
+                }
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:16px;font-weight:700">Total</span>
+                <span class="total-big">@ShopHelper.Money(totalAmount)</span>
+            </div>
+
+            <form asp-controller="Checkout" asp-action="PlaceOrder" method="post" style="display:flex;flex-direction:column;gap:10px;margin:0" data-confirm="cart" data-orders="@okItemsByStall.Count" data-market="@Model.Market.MarketName" data-total="@ShopHelper.Money(totalAmount)">
+                <input type="hidden" name="MarketId" value="@Model.MarketId" />
+                <div class="field">
+                    <label for="PickupName">Receiver name</label>
+                    <input id="PickupName" name="PickupName" value="@checkoutForm?.PickupName" maxlength="100" required />
+                </div>
+                <div class="field">
+                    <label for="PickupPhone">Receiver phone</label>
+                    <input id="PickupPhone" name="PickupPhone" value="@checkoutForm?.PickupPhone" pattern="0[0-9]{9}" title="10 digits starting with 0" required />
+                </div>
+                <div class="field">
+                    <label for="CustomerNote">Note for the farmer (optional)</label>
+                    <textarea id="CustomerNote" name="CustomerNote" rows="2" maxlength="500"></textarea>
+                </div>
+
+                <div class="pay-note">@IconHelper.Icon("cash") Pay in person at pickup</div>
+                <button type="submit" class="btn-ml big" disabled="@nothingToOrder">CONFIRM RESERVATION</button>
+                @if (nothingToOrder)
+                {
+                    <span class="stock-low">None of the items in your basket can be ordered right now.</span>
+                }
+            </form>
+            <span class="muted" style="line-height:1.5">The farmer will hold your items. You can cancel an order from “My orders” before pickup. No online payment.</span>
+        </aside>
+    </div>
+}

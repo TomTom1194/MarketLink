@@ -1,0 +1,240 @@
+@model StockPrice
+@using MarketLink.Helpers
+@{
+    var product = Model.Product!;
+    var stall = Model.Stall!;
+    var market = stall.Market!;
+    var farmer = stall.Farmer!;
+    List<StockPrice> otherProducts = ViewBag.OtherProducts;
+    List<DateTime> pickupDates = ViewBag.PickupDates;
+
+    ViewData["Title"] = product.ProductName;
+    Layout = "_ShopLayout";
+
+    decimal available = Model.QuantityAvailable;
+    bool soldOut = available < 1;
+    string currentPage = Context.Request.Path + Context.Request.QueryString;
+    bool isLoggedIn = User.Identity != null && User.Identity.IsAuthenticated;
+}
+
+<nav class="breadcrumb-ml" aria-label="Breadcrumb">
+    <a asp-controller="Home" asp-action="Index">Home</a><span>›</span>
+    <a asp-action="Products" asp-route-marketId="@market.MarketId">@market.MarketName</a><span>›</span>
+    <a asp-action="Products" asp-route-marketId="@market.MarketId" asp-route-categoryId="@product.CategoryId">@product.Category!.CategoryName</a><span>›</span>
+    <strong>@product.ProductName</strong>
+</nav>
+
+<div class="card-box detail">
+    <div class="main-img">
+        <img class="img-fill" src="@product.ImageUrl" alt="@product.ProductName" />
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+            <h1>@product.ProductName</h1>
+            <span class="muted">Category: <strong style="color:#1F2421">@product.Category!.CategoryName</strong> · Unit: <strong style="color:#1F2421">@product.Unit</strong></span>
+        </div>
+
+        <div class="price-box">
+            <span class="price">@ShopHelper.Money(Model.Price)</span>
+            <span style="font-size:16px;color:#4A5550">/ @product.Unit</span>
+            @if (soldOut)
+            {
+                <span style="margin-left:auto;font-size:15px;font-weight:700;color:#5B6360">Sold out</span>
+            }
+            else
+            {
+                <span style="margin-left:auto;font-size:15px;font-weight:700;color:#0B7A3E">@IconHelper.Icon("check", 16) @ShopHelper.Qty(available) @product.Unit left</span>
+            }
+        </div>
+
+        <form asp-controller="Checkout" asp-action="ReserveNow" method="post" style="display:flex;flex-direction:column;gap:16px;margin:0" data-confirm="reserve" data-name="@product.ProductName" data-unit="@product.Unit" data-price="@Model.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-stall="@(farmer.BrandName) · Stall @stall.StallCode · @market.MarketName">
+            <input type="hidden" name="StockPriceId" value="@Model.StockPriceId" />
+            <input type="hidden" name="ReturnUrl" value="@currentPage" />
+
+            <div class="pickup-box">
+                <span class="head">@IconHelper.Icon("pin") Pickup</span>
+                <div class="info-grid">
+                    <div>
+                        <span class="k">Market</span>
+                        <span class="v">@market.MarketName · Stall @stall.StallCode</span>
+                        <a href="@ShopHelper.MapLink(stall, market)" target="_blank" style="font-size:14px;font-weight:600">Get directions ›</a>
+                    </div>
+                    <div>
+                        <span class="k">Market hours</span>
+                        <span class="v">@ShopHelper.Hours(market.OpenTime, market.CloseTime)</span>
+                        <span class="muted">Stall sells on: @ShopHelper.DayNames(stall.SellingDays)</span>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(stall.LocationNote))
+                {
+                    <span class="muted">Stall location: @stall.LocationNote</span>
+                }
+
+                @if (pickupDates.Count == 0)
+                {
+                    <div class="note-yellow">@IconHelper.Icon("clock") This stall has no selling day in the next 7 days.</div>
+                }
+                else
+                {
+                    <div class="field">
+                        <label for="detailDate">Pickup day</label>
+                        <select id="detailDate" name="PickupDate" onchange="buildDetailSlots()">
+                            @foreach (DateTime d in pickupDates)
+                            {
+                                <option value="@d.ToString("yyyy-MM-dd")">@(d == DateTime.Today ? "Today, " : "")@d.ToString("dddd dd/MM")</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Pickup time</label>
+                        <div class="slot-list" id="detailSlots"></div>
+                    </div>
+                }
+            </div>
+
+            @if (soldOut)
+            {
+                <button type="button" class="btn-ml big block" disabled>SOLD OUT</button>
+            }
+            else
+            {
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                    <div class="qty-box">
+                        <button type="button" aria-label="Decrease" onclick="changeQuantity(-1)">–</button>
+                        <input type="number" id="quantity" name="Quantity" value="1" min="1" max="@((int)available)" step="1" aria-label="Quantity" oninput="updateDetailTotal()" />
+                        <button type="button" aria-label="Increase" onclick="changeQuantity(1)">+</button>
+                    </div>
+                    @if (isLoggedIn)
+                    {
+                        <button type="submit" id="detailReserveButton" class="btn-ml btn-pad" style="flex:1;min-width:220px" disabled="@(pickupDates.Count == 0)">RESERVE NOW – @ShopHelper.Money(Model.Price)</button>
+                        <button type="submit" formaction="@Url.Action("Add", "Cart")" class="btn-ml outline btn-pad">@IconHelper.Icon("basket") Add to basket</button>
+                    }
+                    else
+                    {
+                        <a class="btn-ml big" style="flex:1;min-width:220px" asp-controller="Account" asp-action="Login" asp-route-returnUrl="@currentPage">LOG IN TO RESERVE</a>
+                    }
+                </div>
+                <span class="muted" style="margin-top:-8px">No payment now – pay the farmer at pickup.</span>
+            }
+        </form>
+
+        <div class="farmer-row">
+            <span class="farmer-avatar">@farmer.BrandName.Substring(0, 1).ToUpper()</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:16px;font-weight:700">@farmer.BrandName</span>
+                <span class="muted">Contact: @farmer.ContactPerson · Stall @stall.StallCode</span>
+            </div>
+            <partial name="_FavoriteFarmerButton" model="farmer.FarmerId" view-data='new ViewDataDictionary(ViewData) { { "IsSaved", (bool)ViewBag.IsFavorite } }' />
+        </div>
+    </div>
+</div>
+
+<div class="card-box">
+    <h2 class="title" style="margin-bottom:12px">Description</h2>
+    @if (string.IsNullOrWhiteSpace(product.Description))
+    {
+        <p class="desc">The farmer has not added a description yet.</p>
+    }
+    else
+    {
+        string[] lines = product.Description.Replace("\r", "").Split('\n');
+        bool inList = false;
+        <div class="desc-box">
+            @foreach (string rawLine in lines)
+            {
+                string line = rawLine.Trim();
+                if (line.StartsWith("- "))
+                {
+                    if (!inList)
+                    {
+                        @Html.Raw("<ul class=\"desc-list\">")
+                        inList = true;
+                    }
+                    <li>@line.Substring(2)</li>
+                    continue;
+                }
+
+                if (inList)
+                {
+                    @Html.Raw("</ul>")
+                    inList = false;
+                }
+
+                if (line == "")
+                {
+                    continue;
+                }
+
+                int colonIndex = line.IndexOf(": ");
+                if (line.EndsWith(":"))
+                {
+                    <h3 class="desc-head">@line.Substring(0, line.Length - 1)</h3>
+                }
+                else if (colonIndex > 0 && colonIndex <= 15)
+                {
+                    <p class="desc"><strong>@line.Substring(0, colonIndex):</strong> @line.Substring(colonIndex + 2)</p>
+                }
+                else
+                {
+                    <p class="desc">@line</p>
+                }
+            }
+            @if (inList)
+            {
+                @Html.Raw("</ul>")
+            }
+        </div>
+    }
+</div>
+
+@if (otherProducts.Count > 0)
+{
+    <div class="card-box">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <h2 class="title">More from @farmer.BrandName</h2>
+            <a asp-action="Products" asp-route-marketId="@market.MarketId" asp-route-keyword="@farmer.BrandName" style="font-size:15px;font-weight:700;text-decoration:none">See all ›</a>
+        </div>
+        <div class="h-scroll">
+            @foreach (var sp in otherProducts)
+            {
+                sp.Stall = stall;
+                <div><partial name="_ProductCard" model="sp" /></div>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        var detailPrice = @Model.Price.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var detailMax = @((int)available);
+
+        function changeQuantity(step) {
+            var input = document.getElementById("quantity");
+            var value = parseInt(input.value) || 1;
+            value = value + step;
+            if (value < 1) value = 1;
+            if (value > detailMax) value = detailMax;
+            input.value = value;
+            updateDetailTotal();
+        }
+
+        function updateDetailTotal() {
+            var input = document.getElementById("quantity");
+            var button = document.getElementById("detailReserveButton");
+            if (!input || !button) return;
+            var value = parseInt(input.value) || 1;
+            button.innerText = "RESERVE NOW – " + formatMoney(detailPrice * value);
+        }
+
+        function buildDetailSlots() {
+            var dateSelect = document.getElementById("detailDate");
+            if (!dateSelect) return;
+            buildSlotsFor(dateSelect, document.getElementById("detailSlots"), document.getElementById("detailReserveButton"),
+                "@market.OpenTime.ToString(@"hh\:mm")", "@market.CloseTime.ToString(@"hh\:mm")");
+        }
+
+        buildDetailSlots();
+    </script>
+}

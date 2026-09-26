@@ -1,0 +1,25 @@
+@model int
+@{
+    bool isSaved = ViewData["IsSaved"] is bool saved && saved;
+    string currentPage = Context.Request.Path + Context.Request.QueryString;
+    bool isLoggedIn = User.Identity != null && User.Identity.IsAuthenticated;
+}
+@if (!isLoggedIn)
+{
+    <a class="btn-ml outline fav-btn" asp-controller="Account" asp-action="Login" asp-route-returnUrl="@currentPage">@IconHelper.Icon("heart", 16) Save farmer</a>
+}
+else if (User.IsInRole("customer"))
+{
+    <form method="post" asp-controller="Favorites" asp-action="@(isSaved ? "Remove" : "Add")" class="inline-form">
+        <input type="hidden" name="farmerId" value="@Model" />
+        <input type="hidden" name="returnUrl" value="@currentPage" />
+        @if (isSaved)
+        {
+            <button type="submit" class="btn-ml fav-btn saved" aria-pressed="true" title="Remove from favorites">@IconHelper.Icon("heart", 16, true) Saved</button>
+        }
+        else
+        {
+            <button type="submit" class="btn-ml outline fav-btn" aria-pressed="false">@IconHelper.Icon("heart", 16) Save farmer</button>
+        }
+    </form>
+}

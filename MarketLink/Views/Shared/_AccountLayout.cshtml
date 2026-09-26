@@ -1,0 +1,61 @@
+@using System.Security.Claims
+@using MarketLink.Services
+@inject IProfileService ProfileService
+@{
+    Layout = "_ShopLayout";
+    string menu = ViewData["AccountMenu"] as string ?? "";
+
+    CustomerProfile? profile = null;
+    string? userIdText = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    int userId;
+    if (userIdText != null && int.TryParse(userIdText, out userId))
+    {
+        profile = await ProfileService.GetProfileAsync(userId);
+    }
+
+    string displayName = profile != null ? profile.FullName : (User.Identity?.Name ?? "");
+    string initial = displayName.Length > 0 ? displayName.Substring(0, 1).ToUpper() : "?";
+}
+
+<div class="account-layout">
+    <aside class="account-side">
+        <div class="account-user">
+            <span class="ml-avatar big">@initial</span>
+            <span style="display:flex;flex-direction:column;min-width:0">
+                <span class="account-name">@displayName</span>
+                @if (profile != null)
+                {
+                    <span class="muted">Member since @profile.CreatedAt.ToString("yyyy")</span>
+                }
+            </span>
+        </div>
+        <nav class="account-nav" aria-label="Account">
+            <a class="@(menu == "orders" ? "on" : "")" asp-controller="MyOrders" asp-action="Index" aria-current="@(menu == "orders" ? "page" : null)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>
+                <span>My orders</span>
+            </a>
+            <a class="@(menu == "favorites" ? "on" : "")" asp-controller="Favorites" asp-action="Index" aria-current="@(menu == "favorites" ? "page" : null)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7.5 3c0 5.4-7.5 10-7.5 10z"></path></svg>
+                <span>Favorite farmers</span>
+            </a>
+            <a class="@(menu == "profile" ? "on" : "")" asp-controller="Profile" asp-action="Index" aria-current="@(menu == "profile" ? "page" : null)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"></path></svg>
+                <span>Profile</span>
+            </a>
+            <form asp-controller="Account" asp-action="Logout" method="post" class="account-logout">
+                <button type="submit">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"></path><path d="M10 16l-4-4 4-4"></path><path d="M6 12h10"></path></svg>
+                    <span>Sign out</span>
+                </button>
+            </form>
+        </nav>
+    </aside>
+
+    <div class="account-main">
+        @RenderBody()
+    </div>
+</div>
+
+@section Scripts {
+    @await RenderSectionAsync("Scripts", required: false)
+}

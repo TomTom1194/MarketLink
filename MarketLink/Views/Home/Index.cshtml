@@ -1,8 +1,154 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@using MarketLink.Helpers
+@{
+    ViewData["Title"] = "Fresh from local farmers";
+    Layout = "_ShopLayout";
+
+    Market? currentMarket = ViewBag.CurrentMarket;
+    List<ProductCategory> categories = ViewBag.Categories;
+    List<Market> markets = ViewBag.Markets;
+    List<StockPrice> newestProducts = ViewBag.NewestProducts;
+    List<FarmerProfile> farmers = ViewBag.Farmers;
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="card-box">
+    <div class="cat-row">
+        @foreach (var c in categories)
+        {
+            if (c.ParentId == null)
+            {
+                <a class="cat-item" asp-controller="Shop" asp-action="Products" asp-route-categoryId="@c.CategoryId">
+                    <span class="cat-circle">@c.CategoryName.Substring(0, 1)</span>
+                    <span>@c.CategoryName</span>
+                </a>
+            }
+        }
+    </div>
+</div>
+
+<div class="hero">
+    <div class="hero-main">
+        <span class="badge-ml" style="background:#FFD400;color:#B71C1C;align-self:flex-start">Fresh this week</span>
+        <span class="hero-title">Reserve fresh produce online, pick it up at your local market</span>
+        <span class="hero-sub">Farmers bring exactly what you reserved. No online payment – you pay at the stall.</span>
+        @if (currentMarket != null)
+        {
+            <a class="btn-ml" style="align-self:flex-start" asp-controller="Shop" asp-action="Products" asp-route-marketId="@currentMarket.MarketId">Shop @currentMarket.MarketName ›</a>
+        }
+        else
+        {
+            <a class="btn-ml" style="align-self:flex-start" asp-controller="Shop" asp-action="Index">Choose your market ›</a>
+        }
+    </div>
+    <div class="hero-side">
+        <a class="hero-card yellow" asp-controller="Shop" asp-action="Products" asp-route-keyword="egg">
+            <span style="font-size:14px;font-weight:700;color:#8A5A00">Farm fresh</span>
+            <span class="hero-card-title">Free-range eggs</span>
+            <span style="font-size:15px">Straight from the farm</span>
+        </a>
+        <a class="hero-card green" asp-controller="Shop" asp-action="Products">
+            <span style="font-size:14px;font-weight:700;color:#096633">Seasonal</span>
+            <span class="hero-card-title">Vegetables &amp; fruits</span>
+            <span style="font-size:15px">Picked the day before market</span>
+        </a>
+    </div>
+</div>
+
+<div class="card-box info-row">
+    <div class="info-item">
+        <span class="group-icon" style="width:44px;height:44px">@IconHelper.Icon("basket", 22)</span>
+        <span style="display:flex;flex-direction:column"><strong>Reserve online</strong><span class="muted">Choose products from farmers</span></span>
+    </div>
+    <div class="info-item">
+        <span class="group-icon" style="width:44px;height:44px">@IconHelper.Icon("pin", 22)</span>
+        <span style="display:flex;flex-direction:column"><strong>Pick up at the market</strong><span class="muted">On the stall's selling day</span></span>
+    </div>
+    <div class="info-item">
+        <span class="group-icon" style="width:44px;height:44px">@IconHelper.Icon("cash", 22)</span>
+        <span style="display:flex;flex-direction:column"><strong>Pay at the stall</strong><span class="muted">No online payment needed</span></span>
+    </div>
+</div>
+
+<div class="card-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+        <h2 class="title">Markets on MarketLink</h2>
+        <a class="btn-ml outline" style="height:40px;font-size:14px" asp-controller="Shop" asp-action="Index">Find by district</a>
+    </div>
+    @if (markets.Count == 0)
+    {
+        <span class="muted">No markets yet.</span>
+    }
+    else
+    {
+        <div class="market-grid">
+            @foreach (var m in markets)
+            {
+                int stallCount = 0;
+                foreach (var s in m.Stalls)
+                {
+                    if (s.IsActive) stallCount++;
+                }
+                <a class="market-card @(currentMarket != null && currentMarket.MarketId == m.MarketId ? "on" : "")" asp-controller="Shop" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">
+                    @if (!string.IsNullOrEmpty(m.ImageUrl))
+                    {
+                        <img class="market-img" src="@m.ImageUrl" alt="@m.MarketName" loading="lazy" />
+                    }
+                    <span class="badge-ml badge-green" style="align-self:flex-start;height:26px;font-size:13px">@(m.District != null ? m.District.DistrictName : "")@(m.District != null && m.District.City != null ? ", " + m.District.City.CityName : "")</span>
+                    <span class="name">@m.MarketName</span>
+                    <span class="muted">@IconHelper.Icon("calendar") @ShopHelper.DayNames(m.OpenDays) · @ShopHelper.Hours(m.OpenTime, m.CloseTime)</span>
+                    <span class="muted">@IconHelper.Icon("store") @stallCount @(stallCount == 1 ? "stall" : "stalls") selling</span>
+                    <span class="go">Shop this market ›</span>
+                </a>
+            }
+        </div>
+    }
+</div>
+
+<div class="card-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px">
+        <h2 class="title">@(currentMarket != null ? "New at " + currentMarket.MarketName : "Newest products")</h2>
+        <a asp-controller="Shop" asp-action="Products" style="font-size:15px;font-weight:700;text-decoration:none">See all ›</a>
+    </div>
+    @if (newestProducts.Count == 0)
+    {
+        <span class="muted">No products yet. Please check back later.</span>
+    }
+    else
+    {
+        <div class="product-grid home">
+            @foreach (var sp in newestProducts)
+            {
+                <partial name="_ProductCard" model="sp" />
+            }
+        </div>
+    }
+</div>
+
+@if (farmers.Count > 0)
+{
+    <div class="card-box">
+        <h2 class="title" style="margin-bottom:14px">Featured farmers</h2>
+        <div class="farmer-grid">
+            @foreach (var f in farmers)
+            {
+                Stall? firstStall = null;
+                foreach (var s in f.Stalls)
+                {
+                    if (s.IsActive && firstStall == null) firstStall = s;
+                }
+                <a class="farmer-card" asp-controller="Shop" asp-action="Products" asp-route-marketId="@(firstStall != null ? firstStall.MarketId : null)" asp-route-keyword="@f.BrandName">
+                    <span class="farmer-avatar" style="width:88px;height:88px;font-size:32px;border:3px solid #E6F4EA">@f.BrandName.Substring(0, 1).ToUpper()</span>
+                    <span style="font-size:15px;font-weight:700;line-height:1.3">@f.BrandName</span>
+                    @if (firstStall != null && firstStall.Market != null)
+                    {
+                        <span class="muted">@firstStall.Market.MarketName</span>
+                    }
+                </a>
+            }
+        </div>
+    </div>
+}
+
+<div class="farmer-banner">
+    <span class="hero-card-title" style="color:#fff;flex:1;min-width:240px">Sell your harvest on MarketLink – list products and take pre-orders for free</span>
+    <a class="btn-ml" style="background:#fff;color:#0B7A3E !important" asp-controller="Account" asp-action="Register">Join MarketLink ›</a>
 </div>
