@@ -9,7 +9,7 @@ namespace MarketLink.Services
 
         List<DateTime> GetPickupDates(Stall stall, Market market);
 
-        DateTime? GetNextPickupDate(Stall stall, Market market);
+        List<DateTime> GetCommonPickupDates(List<Stall> stalls, Market market);
 
         Task<CheckoutResultDto> ReserveNowAsync(int customerId, QuickReserveDto model);
 

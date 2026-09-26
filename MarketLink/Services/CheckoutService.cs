@@ -2,6 +2,7 @@ using MarketLink.Data;
 using MarketLink.Dtos;
 using MarketLink.Helpers;
 using MarketLink.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace MarketLink.Services
@@ -52,19 +53,109 @@ namespace MarketLink.Services
             return dates;
         }
 
-        public DateTime? GetNextPickupDate(Stall stall, Market market)
+        public List<DateTime> GetCommonPickupDates(List<Stall> stalls, Market market)
         {
-            List<DateTime> dates = GetPickupDates(stall, market);
-            if (dates.Count == 0)
+            var dates = new List<DateTime>();
+            if (stalls.Count == 0)
             {
-                return null;
+                return dates;
             }
-            return dates[0];
+
+            dates = GetPickupDates(stalls[0], market);
+            for (int i = 1; i < stalls.Count; i++)
+            {
+                List<DateTime> stallDates = GetPickupDates(stalls[i], market);
+                dates = dates.Where(d => stallDates.Contains(d)).ToList();
+            }
+            return dates;
+        }
+
+        private string CheckPickupTime(DateTime? pickupDate, string? pickupSlot, List<DateTime> validDates, Market market, out TimeSpan pickupFrom, out TimeSpan pickupTo)
+        {
+            pickupFrom = TimeSpan.Zero;
+            pickupTo = TimeSpan.Zero;
+
+            if (pickupDate == null || !validDates.Contains(pickupDate.Value.Date))
+            {
+                return "The selected pickup day is not available. Please choose another day.";
+            }
+
+            string[] slotParts = (pickupSlot ?? "").Split('-');
+            if (slotParts.Length != 2 || !TimeSpan.TryParse(slotParts[0], out pickupFrom) || !TimeSpan.TryParse(slotParts[1], out pickupTo))
+            {
+                return "Please choose a pickup time.";
+            }
+
+            if (pickupFrom >= pickupTo || pickupFrom < market.OpenTime || pickupTo > market.CloseTime)
+            {
+                return "The pickup time must be within market hours.";
+            }
+
+            if (pickupDate.Value.Date == DateTime.Today && pickupTo <= DateTime.Now.TimeOfDay)
+            {
+                return "This pickup time has already passed. Please choose a later time.";
+            }
+
+            return "";
         }
 
         public async Task<CheckoutResultDto> ReserveNowAsync(int customerId, QuickReserveDto model)
         {
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                try
+                {
+                    return await TryReserveNowAsync(customerId, model);
+                }
+                catch (SqlException ex)
+                {
+                    if (ex.Number != 1205)
+                    {
+                        throw;
+                    }
+                    _context.ChangeTracker.Clear();
+                }
+            }
+            return BusyResult();
+        }
+
+        public async Task<CheckoutResultDto> PlaceOrdersAsync(int customerId, CheckoutDto model)
+        {
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                try
+                {
+                    return await TryPlaceOrdersAsync(customerId, model);
+                }
+                catch (SqlException ex)
+                {
+                    if (ex.Number != 1205)
+                    {
+                        throw;
+                    }
+                    _context.ChangeTracker.Clear();
+                }
+            }
+            return BusyResult();
+        }
+
+        private CheckoutResultDto BusyResult()
+        {
             var result = new CheckoutResultDto();
+            result.Errors.Add("Many customers are ordering at the same time. Please check My orders, then try again if needed.");
+            return result;
+        }
+
+        private async Task<CheckoutResultDto> TryReserveNowAsync(int customerId, QuickReserveDto model)
+        {
+            var result = new CheckoutResultDto();
+
+            string quantityError = ShopHelper.CheckQuantity(model.Quantity);
+            if (quantityError != "")
+            {
+                result.Errors.Add(quantityError);
+                return result;
+            }
 
             var customer = await GetCustomerAsync(customerId);
             if (customer == null)
@@ -89,12 +180,6 @@ namespace MarketLink.Services
                 return result;
             }
 
-            if (model.Quantity <= 0)
-            {
-                result.Errors.Add("Quantity must be greater than 0.");
-                return result;
-            }
-
             if (model.Quantity > sp.QuantityAvailable)
             {
                 result.Errors.Add("Only " + sp.QuantityAvailable.ToString("0.##") + " " + sp.Product.Unit + " left.");
@@ -104,43 +189,35 @@ namespace MarketLink.Services
             var stall = sp.Stall;
             var market = stall.Market!;
 
-            List<DateTime> validDates = GetPickupDates(stall, market);
-            if (!validDates.Contains(model.PickupDate.Date))
-            {
-                result.Errors.Add("The stall does not sell on the selected day. Please choose another day.");
-                return result;
-            }
-
-            string[] slotParts = (model.PickupSlot ?? "").Split('-');
             TimeSpan pickupFrom;
             TimeSpan pickupTo;
-            if (slotParts.Length != 2 || !TimeSpan.TryParse(slotParts[0], out pickupFrom) || !TimeSpan.TryParse(slotParts[1], out pickupTo))
+            string pickupError = CheckPickupTime(model.PickupDate, model.PickupSlot, GetPickupDates(stall, market), market, out pickupFrom, out pickupTo);
+            if (pickupError != "")
             {
-                result.Errors.Add("Please choose a pickup time.");
+                result.Errors.Add(pickupError);
                 return result;
             }
 
-            if (pickupFrom >= pickupTo || pickupFrom < market.OpenTime || pickupTo > market.CloseTime)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            await LockCustomerAsync(customerId);
+
+            DateTime recentTime = DateTime.Now.AddSeconds(-30);
+            bool justReserved = await _context.Orders.AnyAsync(o => o.CustomerId == customerId
+                && o.Status == "placed"
+                && o.PlacedAt >= recentTime
+                && o.Items.Any(i => i.StockPriceId == sp.StockPriceId && i.Quantity == model.Quantity));
+            if (justReserved)
             {
-                result.Errors.Add("The pickup time must be within market hours.");
+                result.Errors.Add("You have just reserved this product. Please check My orders.");
                 return result;
             }
-
-            if (model.PickupDate.Date == DateTime.Today && pickupTo <= DateTime.Now.TimeOfDay)
-            {
-                result.Errors.Add("This pickup time has already passed. Please choose a later time.");
-                return result;
-            }
-
-            string codePrefix = "ML-" + DateTime.Now.ToString("yyMMdd") + "-";
-            int todayOrderCount = await _context.Orders.CountAsync(o => o.OrderCode.StartsWith(codePrefix));
 
             var order = new Order
             {
-                OrderCode = codePrefix + (todayOrderCount + 1).ToString("D4"),
                 CustomerId = customerId,
                 StallId = stall.StallId,
-                PickupDate = model.PickupDate.Date,
+                PickupDate = model.PickupDate!.Value.Date,
                 PickupFrom = pickupFrom,
                 PickupTo = pickupTo,
                 PickupName = customer.FullName,
@@ -162,34 +239,31 @@ namespace MarketLink.Services
                 Quantity = model.Quantity
             });
 
-            sp.QuantityReserved = sp.QuantityReserved + model.Quantity;
-
             _context.Orders.Add(order);
 
-            _context.Notifications.Add(new Notification
+            var notification = new Notification
             {
                 UserId = stall.FarmerId,
                 Order = order,
                 Type = "new_order",
-                Title = "New order " + order.OrderCode,
                 Body = order.PickupName + " reserved " + model.Quantity.ToString("0.##") + " " + sp.Product.Unit + " of " + sp.Product.ProductName
                     + ". Pickup on " + order.PickupDate.ToString("dd/MM/yyyy") + ", " + pickupFrom.ToString(@"hh\:mm") + " - " + pickupTo.ToString(@"hh\:mm") + "."
-            });
+            };
+            _context.Notifications.Add(notification);
 
-            try
+            string saveError = await SaveOrdersAsync(new List<Order> { order }, new List<Notification> { notification });
+            if (saveError != "")
             {
-                await _context.SaveChangesAsync();
-                result.Orders.Add(order);
-            }
-            catch (DbUpdateException)
-            {
-                result.Errors.Add("This product was just reserved by other customers. Please try again.");
+                result.Errors.Add(saveError);
+                return result;
             }
 
+            await transaction.CommitAsync();
+            result.Orders.Add(order);
             return result;
         }
 
-        public async Task<CheckoutResultDto> PlaceOrdersAsync(int customerId, CheckoutDto model)
+        private async Task<CheckoutResultDto> TryPlaceOrdersAsync(int customerId, CheckoutDto model)
         {
             var result = new CheckoutResultDto();
 
@@ -217,8 +291,21 @@ namespace MarketLink.Services
             {
                 var sp = item.StockPrice!;
 
-                if (ShopHelper.ItemStatus(sp) != "ok")
+                string status = ShopHelper.ItemStatus(sp);
+                if (status != "ok")
                 {
+                    if (!model.SkippedItemIds.Contains(item.CartItemId))
+                    {
+                        string reason = status == "sold_out" ? "has just sold out" : "is no longer available";
+                        result.Errors.Add(sp.Product!.ProductName + " " + reason + ". Please check your basket again before ordering.");
+                    }
+                    continue;
+                }
+
+                string quantityError = ShopHelper.CheckQuantity(item.Quantity);
+                if (quantityError != "")
+                {
+                    result.Errors.Add(sp.Product!.ProductName + ": " + quantityError);
                     continue;
                 }
 
@@ -241,43 +328,51 @@ namespace MarketLink.Services
                 return result;
             }
 
-            var pickupDateByStall = new Dictionary<int, DateTime>();
-            foreach (int stallId in itemsByStall.Keys)
-            {
-                var stall = itemsByStall[stallId][0].StockPrice!.Stall!;
-                DateTime? pickupDate = GetNextPickupDate(stall, cart.Market!);
-
-                if (pickupDate == null)
-                {
-                    result.Errors.Add("Stall " + stall.StallCode + " has no selling day in the next 7 days.");
-                }
-                else
-                {
-                    pickupDateByStall[stallId] = pickupDate.Value;
-                }
-            }
-
             if (result.Errors.Count > 0)
             {
                 return result;
             }
 
-            string codePrefix = "ML-" + DateTime.Now.ToString("yyMMdd") + "-";
-            int todayOrderCount = await _context.Orders.CountAsync(o => o.OrderCode.StartsWith(codePrefix));
+            var stalls = new List<Stall>();
+            foreach (int stallId in itemsByStall.Keys)
+            {
+                stalls.Add(itemsByStall[stallId][0].StockPrice!.Stall!);
+            }
+
+            List<DateTime> commonDates = GetCommonPickupDates(stalls, cart.Market!);
+            if (commonDates.Count == 0)
+            {
+                result.Errors.Add("The farmers in your basket have no common selling day in the next 7 days. Please remove some items and order them separately.");
+                return result;
+            }
+
+            TimeSpan pickupFrom;
+            TimeSpan pickupTo;
+            string pickupError = CheckPickupTime(model.PickupDate, model.PickupSlot, commonDates, cart.Market!, out pickupFrom, out pickupTo);
+            if (pickupError != "")
+            {
+                result.Errors.Add(pickupError);
+                return result;
+            }
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            await LockCustomerAsync(customerId);
+
+            var orders = new List<Order>();
+            var notifications = new List<Notification>();
 
             foreach (int stallId in itemsByStall.Keys)
             {
                 var stall = itemsByStall[stallId][0].StockPrice!.Stall!;
-                todayOrderCount++;
 
                 var order = new Order
                 {
-                    OrderCode = codePrefix + todayOrderCount.ToString("D4"),
                     CustomerId = customerId,
                     StallId = stallId,
-                    PickupDate = pickupDateByStall[stallId],
-                    PickupFrom = cart.Market!.OpenTime,
-                    PickupTo = cart.Market.CloseTime,
+                    PickupDate = model.PickupDate!.Value.Date,
+                    PickupFrom = pickupFrom,
+                    PickupTo = pickupTo,
                     PickupName = model.PickupName.Trim(),
                     PickupPhone = model.PickupPhone.Trim(),
                     CustomerNote = string.IsNullOrWhiteSpace(model.CustomerNote) ? null : model.CustomerNote.Trim(),
@@ -302,23 +397,22 @@ namespace MarketLink.Services
                         Quantity = item.Quantity
                     });
 
-                    sp.QuantityReserved = sp.QuantityReserved + item.Quantity;
                     totalAmount = totalAmount + sp.Price * item.Quantity;
                 }
                 order.TotalAmount = totalAmount;
 
                 _context.Orders.Add(order);
+                orders.Add(order);
 
-                _context.Notifications.Add(new Notification
+                var notification = new Notification
                 {
                     UserId = stall.FarmerId,
                     Order = order,
                     Type = "new_order",
-                    Title = "New order " + order.OrderCode,
-                    Body = order.PickupName + " reserved " + order.Items.Count + " item(s), total $" + totalAmount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) + ". Pickup on " + order.PickupDate.ToString("dd/MM/yyyy") + "."
-                });
-
-                result.Orders.Add(order);
+                    Body = order.PickupName + " reserved " + order.Items.Count + " item(s), total $" + totalAmount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) + ". Pickup on " + order.PickupDate.ToString("dd/MM/yyyy") + ", " + pickupFrom.ToString(@"hh\:mm") + " - " + pickupTo.ToString(@"hh\:mm") + "."
+                };
+                _context.Notifications.Add(notification);
+                notifications.Add(notification);
             }
 
             foreach (int stallId in itemsByStall.Keys)
@@ -327,17 +421,86 @@ namespace MarketLink.Services
             }
             cart.UpdatedAt = DateTime.Now;
 
-            try
+            string saveError = await SaveOrdersAsync(orders, notifications);
+            if (saveError != "")
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                result.Errors.Add("Some items were just reserved by other customers. Please check your basket and try again.");
-                result.Orders.Clear();
+                result.Errors.Add(saveError);
+                return result;
             }
 
+            await transaction.CommitAsync();
+            result.Orders.AddRange(orders);
             return result;
+        }
+
+        private async Task LockCustomerAsync(int customerId)
+        {
+            await _context.CustomerProfiles
+                .Where(c => c.CustomerId == customerId)
+                .ExecuteUpdateAsync(x => x.SetProperty(c => c.FullName, c => c.FullName));
+        }
+
+        private async Task<string> SaveOrdersAsync(List<Order> orders, List<Notification> notifications)
+        {
+            string codePrefix = "ML-" + DateTime.Now.ToString("yyMMdd") + "-";
+
+            for (int attempt = 1; attempt <= 5; attempt++)
+            {
+                int lastNumber = await GetLastOrderNumberAsync(codePrefix);
+                for (int i = 0; i < orders.Count; i++)
+                {
+                    lastNumber++;
+                    orders[i].OrderCode = codePrefix + lastNumber.ToString("D4");
+                    notifications[i].Title = "New order " + orders[i].OrderCode;
+                }
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    return "";
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    return "Your basket has just been ordered or changed. Please check My orders before trying again.";
+                }
+                catch (DbUpdateException ex)
+                {
+                    var sqlError = ex.InnerException as SqlException;
+                    if (sqlError != null && sqlError.Number == 1205)
+                    {
+                        throw sqlError;
+                    }
+                    if (!IsDuplicateKeyError(ex))
+                    {
+                        return "Could not save your order. Please try again.";
+                    }
+                }
+            }
+
+            return "The system is busy right now. Please try again in a moment.";
+        }
+
+        private async Task<int> GetLastOrderNumberAsync(string codePrefix)
+        {
+            string? lastCode = await _context.Orders
+                .Where(o => o.OrderCode.StartsWith(codePrefix))
+                .OrderByDescending(o => o.OrderCode.Length)
+                .ThenByDescending(o => o.OrderCode)
+                .Select(o => o.OrderCode)
+                .FirstOrDefaultAsync();
+
+            int lastNumber = 0;
+            if (lastCode != null)
+            {
+                int.TryParse(lastCode.Substring(codePrefix.Length), out lastNumber);
+            }
+            return lastNumber;
+        }
+
+        private bool IsDuplicateKeyError(DbUpdateException ex)
+        {
+            var sqlError = ex.InnerException as SqlException;
+            return sqlError != null && (sqlError.Number == 2627 || sqlError.Number == 2601);
         }
     }
 }

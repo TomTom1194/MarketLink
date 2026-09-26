@@ -15,7 +15,11 @@ namespace MarketLink.Services
 
         Task<List<ProductCategory>> GetCategoriesAsync();
 
-        Task<List<StockPrice>> SearchProductsAsync(int marketId, string? keyword, int? categoryId, string? sort);
+        Task<List<StockPrice>> SearchProductsAsync(int marketId, string? keyword, int? categoryId, int? farmerId, string? sort, PagerDto pager);
+
+        Task<int> CountProductsAsync(int marketId, string? keyword, int? categoryId, int? farmerId);
+
+        Task<FarmerProfile?> GetFarmerAsync(int farmerId);
 
         Task<StockPrice?> GetProductDetailAsync(int stockPriceId);
 
@@ -28,5 +32,7 @@ namespace MarketLink.Services
         Task<List<FarmerProfile>> GetFeaturedFarmersAsync(int take);
 
         Task<List<MarketDistanceDto>> GetNearestMarketsAsync(double latitude, double longitude);
+
+        Task<List<MarketSearchResultDto>> SearchAllMarketsAsync(string keyword, double? latitude, double? longitude, int? currentMarketId);
     }
 }

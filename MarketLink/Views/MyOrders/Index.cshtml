@@ -9,14 +9,7 @@
 
 <h1 class="title">My orders</h1>
 
-<nav class="tabs" aria-label="Filter orders">
-    <a class="@(string.IsNullOrEmpty(status) ? "on" : "")" asp-action="Index">All</a>
-    <a class="@(status == "placed" ? "on" : "")" asp-action="Index" asp-route-status="placed">Waiting for farmer</a>
-    <a class="@(status == "accepted" ? "on" : "")" asp-action="Index" asp-route-status="accepted">Ready for pickup</a>
-    <a class="@(status == "completed" ? "on" : "")" asp-action="Index" asp-route-status="completed">Picked up</a>
-    <a class="@(status == "cancelled" ? "on" : "")" asp-action="Index" asp-route-status="cancelled">Cancelled</a>
-    <a class="@(status == "rejected" ? "on" : "")" asp-action="Index" asp-route-status="rejected">Rejected</a>
-</nav>
+<partial name="_OrderTabs" />
 
 @if (Model.Count == 0)
 {
@@ -86,6 +79,12 @@ else
                     @if (o.Status == "placed" || o.Status == "accepted")
                     {
                         <a class="btn-ml danger" style="height:40px;font-size:14px" asp-action="Detail" asp-route-id="@o.OrderId" asp-fragment="cancel">Cancel</a>
+                    }
+                    @if (o.Status == "completed")
+                    {
+                        <form asp-action="Reorder" asp-route-id="@o.OrderId" method="post" class="inline-form">
+                            <button type="submit" class="btn-ml" style="height:40px;font-size:14px">@IconHelper.Icon("basket", 16) Reorder</button>
+                        </form>
                     }
                     <a class="btn-ml outline" style="height:40px;font-size:14px" asp-action="Detail" asp-route-id="@o.OrderId">Details ›</a>
                 </div>

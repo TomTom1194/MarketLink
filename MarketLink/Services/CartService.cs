@@ -1,4 +1,5 @@
 using MarketLink.Data;
+using MarketLink.Dtos;
 using MarketLink.Helpers;
 using MarketLink.Models;
 using Microsoft.EntityFrameworkCore;
@@ -141,9 +142,10 @@ namespace MarketLink.Services
 
         public async Task<string> AddToCartAsync(int customerId, int stockPriceId, decimal quantity)
         {
-            if (quantity <= 0)
+            string quantityError = ShopHelper.CheckQuantity(quantity);
+            if (quantityError != "")
             {
-                return "Quantity must be greater than 0.";
+                return quantityError;
             }
 
             var stockPrice = await _context.StockPrices
@@ -188,6 +190,11 @@ namespace MarketLink.Services
                 newQuantity = existingItem.Quantity + quantity;
             }
 
+            if (newQuantity > ShopHelper.MaxQuantity)
+            {
+                return "You can order at most " + ShopHelper.MaxQuantity + " of one product.";
+            }
+
             if (newQuantity > stockPrice.QuantityAvailable)
             {
                 return "Only " + stockPrice.QuantityAvailable.ToString("0.##") + " " + stockPrice.Product.Unit + " left.";
@@ -207,7 +214,14 @@ namespace MarketLink.Services
             }
 
             cart.UpdatedAt = DateTime.Now;
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return "Could not add this product to your basket. Please try again.";
+            }
             return "";
         }
 
@@ -229,6 +243,12 @@ namespace MarketLink.Services
                 _context.CartItems.Remove(item);
                 await _context.SaveChangesAsync();
                 return "";
+            }
+
+            string quantityError = ShopHelper.CheckQuantity(quantity);
+            if (quantityError != "")
+            {
+                return quantityError;
             }
 
             if (quantity > item.StockPrice!.QuantityAvailable)
@@ -257,6 +277,142 @@ namespace MarketLink.Services
             _context.CartItems.Remove(item);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<ReorderResultDto> ReorderAsync(int customerId, int orderId)
+        {
+            var result = new ReorderResultDto();
+
+            var order = await _context.Orders
+                .Include(o => o.Items)
+                .Include(o => o.Stall)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId && o.CustomerId == customerId);
+
+            if (order == null)
+            {
+                result.Error = "Order not found.";
+                return result;
+            }
+
+            if (order.Status != "completed")
+            {
+                result.Error = "Only completed orders can be reordered.";
+                return result;
+            }
+
+            result.OrderCode = order.OrderCode;
+            result.MarketId = order.Stall!.MarketId;
+
+            var cart = await _context.Carts
+                .Include(c => c.Items)
+                .FirstOrDefaultAsync(c => c.CustomerId == customerId && c.MarketId == result.MarketId);
+
+            if (cart == null)
+            {
+                cart = new Cart
+                {
+                    CustomerId = customerId,
+                    MarketId = result.MarketId
+                };
+                _context.Carts.Add(cart);
+            }
+
+            foreach (var item in order.Items)
+            {
+                var sp = await _context.StockPrices
+                    .Include(x => x.Product)
+                    .Include(x => x.Stall)
+                    .ThenInclude(st => st!.Farmer)
+                    .FirstOrDefaultAsync(x => x.ProductId == item.ProductId && x.StallId == order.StallId && x.EffectiveTo == null);
+
+                string status = sp == null ? "unavailable" : ShopHelper.ItemStatus(sp);
+                if (status == "unavailable")
+                {
+                    result.Notices.Add(item.ProductName + " is no longer on sale – not added.");
+                    continue;
+                }
+                if (status == "sold_out")
+                {
+                    result.Notices.Add(item.ProductName + " is sold out – not added.");
+                    continue;
+                }
+
+                var stockPrice = sp!;
+                string unit = stockPrice.Product!.Unit;
+
+                if (stockPrice.Price != item.UnitPrice)
+                {
+                    result.Notices.Add(item.ProductName + ": price changed from " + ShopHelper.Money(item.UnitPrice) + " to " + ShopHelper.Money(stockPrice.Price) + " per " + unit + ".");
+                }
+
+                CartItem? existingItem = null;
+                foreach (var cartItem in cart.Items)
+                {
+                    if (cartItem.StockPriceId == stockPrice.StockPriceId)
+                    {
+                        existingItem = cartItem;
+                    }
+                }
+
+                decimal inBasket = existingItem != null ? existingItem.Quantity : 0;
+                decimal wanted = Math.Floor(item.Quantity);
+                if (wanted < 1)
+                {
+                    wanted = 1;
+                }
+
+                decimal maxQuantity = Math.Floor(stockPrice.QuantityAvailable);
+                if (maxQuantity > ShopHelper.MaxQuantity)
+                {
+                    maxQuantity = ShopHelper.MaxQuantity;
+                }
+
+                decimal newQuantity = inBasket + wanted;
+                if (newQuantity > maxQuantity)
+                {
+                    if (maxQuantity <= inBasket)
+                    {
+                        result.Notices.Add(item.ProductName + ": your basket already has " + ShopHelper.Qty(inBasket) + " " + unit + ", which is all that is left – not added.");
+                        continue;
+                    }
+
+                    result.Notices.Add("Only " + ShopHelper.Qty(maxQuantity) + " " + unit + " of " + item.ProductName + " left – basket quantity set to "
+                        + ShopHelper.Qty(maxQuantity) + " instead of " + ShopHelper.Qty(newQuantity) + ".");
+                    newQuantity = maxQuantity;
+                }
+
+                if (existingItem != null)
+                {
+                    existingItem.Quantity = newQuantity;
+                }
+                else
+                {
+                    cart.Items.Add(new CartItem
+                    {
+                        StockPriceId = stockPrice.StockPriceId,
+                        Quantity = newQuantity
+                    });
+                }
+                result.AddedCount++;
+            }
+
+            if (result.AddedCount == 0)
+            {
+                return result;
+            }
+
+            cart.UpdatedAt = DateTime.Now;
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                result.Error = "Could not add these products to your basket. Please try again.";
+                result.AddedCount = 0;
+            }
+
+            return result;
         }
     }
 }

@@ -6,7 +6,7 @@ namespace MarketLink.Dtos
 
         public decimal Quantity { get; set; }
 
-        public DateTime PickupDate { get; set; }
+        public DateTime? PickupDate { get; set; }
 
         public string? PickupSlot { get; set; }
 

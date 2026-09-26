@@ -1,3 +1,4 @@
+using MarketLink.Dtos;
 using MarketLink.Models;
 
 namespace MarketLink.Services
@@ -9,5 +10,9 @@ namespace MarketLink.Services
         Task<Order?> GetOrderDetailAsync(int customerId, int orderId);
 
         Task<string> CancelOrderAsync(int customerId, int orderId, string reason);
+
+        Task<List<PickupDayDto>> GetPickupScheduleAsync(int customerId);
+
+        Task<int> CountWaitingOrdersAsync(int customerId);
     }
 }
