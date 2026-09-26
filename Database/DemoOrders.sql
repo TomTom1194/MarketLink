@@ -118,7 +118,7 @@ UPDATE stock SET stock.quantity_reserved = stock.quantity_reserved + totals.rese
                  stock.quantity_sold = stock.quantity_sold + totals.sold
 FROM Stock_Price AS stock JOIN (
     SELECT item.stock_price_id,
-           SUM(CASE WHEN o.status IN ('placed', 'accepted') THEN item.quantity ELSE 0 END) AS reserved,
+           SUM(CASE WHEN o.status = 'accepted' THEN item.quantity ELSE 0 END) AS reserved,
            SUM(CASE WHEN o.status = 'completed' THEN item.quantity ELSE 0 END) AS sold
     FROM @newOrders AS newly JOIN Orders AS o ON o.order_id = newly.order_id
     JOIN Order_Snapshot AS item ON item.order_id = o.order_id GROUP BY item.stock_price_id

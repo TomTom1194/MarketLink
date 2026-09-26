@@ -1,3 +1,4 @@
+using System.Data;
 using MarketLink.Data;
 using MarketLink.Models;
 using Microsoft.EntityFrameworkCore;
@@ -56,10 +57,10 @@ namespace MarketLink.Services
                 return "Reason must be at most 500 characters.";
             }
 
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             var order = await _context.Orders
                 .Include(o => o.Stall)
                 .Include(o => o.Items)
-                .ThenInclude(i => i.StockPrice)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId && o.CustomerId == customerId);
 
             if (order == null)
@@ -72,13 +73,16 @@ namespace MarketLink.Services
                 return "This order can no longer be cancelled.";
             }
 
-            foreach (var item in order.Items)
+            if (order.Status == "accepted")
             {
-                var sp = item.StockPrice!;
-                sp.QuantityReserved = sp.QuantityReserved - item.Quantity;
-                if (sp.QuantityReserved < 0)
+                var quantities = order.Items.GroupBy(item => item.StockPriceId)
+                    .Select(group => new { StockPriceId = group.Key, Quantity = group.Sum(item => item.Quantity) });
+                foreach (var line in quantities)
                 {
-                    sp.QuantityReserved = 0;
+                    var updated = await _context.StockPrices
+                        .Where(stock => stock.StockPriceId == line.StockPriceId && stock.StallId == order.StallId && stock.QuantityReserved >= line.Quantity)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(stock => stock.QuantityReserved, stock => stock.QuantityReserved - line.Quantity));
+                    if (updated != 1) return "Reserved stock could not be released. Please contact the farmer.";
                 }
             }
 
@@ -96,6 +100,7 @@ namespace MarketLink.Services
             });
 
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
             return "";
         }
     }

@@ -162,8 +162,6 @@ namespace MarketLink.Services
                 Quantity = model.Quantity
             });
 
-            sp.QuantityReserved = sp.QuantityReserved + model.Quantity;
-
             _context.Orders.Add(order);
 
             _context.Notifications.Add(new Notification
@@ -172,7 +170,7 @@ namespace MarketLink.Services
                 Order = order,
                 Type = "new_order",
                 Title = "New order " + order.OrderCode,
-                Body = order.PickupName + " reserved " + model.Quantity.ToString("0.##") + " " + sp.Product.Unit + " of " + sp.Product.ProductName
+                Body = order.PickupName + " ordered " + model.Quantity.ToString("0.##") + " " + sp.Product.Unit + " of " + sp.Product.ProductName
                     + ". Pickup on " + order.PickupDate.ToString("dd/MM/yyyy") + ", " + pickupFrom.ToString(@"hh\:mm") + " - " + pickupTo.ToString(@"hh\:mm") + "."
             });
 
@@ -183,7 +181,7 @@ namespace MarketLink.Services
             }
             catch (DbUpdateException)
             {
-                result.Errors.Add("This product was just reserved by other customers. Please try again.");
+                result.Errors.Add("This order could not be placed. Please try again.");
             }
 
             return result;
@@ -302,7 +300,6 @@ namespace MarketLink.Services
                         Quantity = item.Quantity
                     });
 
-                    sp.QuantityReserved = sp.QuantityReserved + item.Quantity;
                     totalAmount = totalAmount + sp.Price * item.Quantity;
                 }
                 order.TotalAmount = totalAmount;
@@ -315,7 +312,7 @@ namespace MarketLink.Services
                     Order = order,
                     Type = "new_order",
                     Title = "New order " + order.OrderCode,
-                    Body = order.PickupName + " reserved " + order.Items.Count + " item(s), total $" + totalAmount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) + ". Pickup on " + order.PickupDate.ToString("dd/MM/yyyy") + "."
+                    Body = order.PickupName + " ordered " + order.Items.Count + " item(s), total $" + totalAmount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) + ". Pickup on " + order.PickupDate.ToString("dd/MM/yyyy") + "."
                 });
 
                 result.Orders.Add(order);
@@ -333,7 +330,7 @@ namespace MarketLink.Services
             }
             catch (DbUpdateException)
             {
-                result.Errors.Add("Some items were just reserved by other customers. Please check your basket and try again.");
+                result.Errors.Add("Some items could not be ordered. Please check your basket and try again.");
                 result.Orders.Clear();
             }
 

@@ -111,6 +111,7 @@ namespace MarketLink.Services
             var order = await GetTrackedOrderAsync(id, farmerId);
             if (order == null || !IsStatus(order, "placed")) return false;
 
+            await ReserveStockAsync(order);
             order.Status = "accepted";
             order.AcceptedAt = DateTime.Now;
             AddCustomerNotification(order, "order_accepted", $"Đơn hàng #{order.OrderCode} đã được xác nhận", "Nông dân đã xác nhận đơn hàng của bạn. Hẹn gặp bạn vào thời gian nhận hàng đã chọn.");
@@ -128,7 +129,6 @@ namespace MarketLink.Services
             var order = await GetTrackedOrderAsync(id, farmerId);
             if (order == null || !IsStatus(order, "placed")) return false;
 
-            await AdjustReservedStockAsync(order, complete: false);
             order.Status = "rejected";
             order.RejectReason = reason;
             order.RejectedAt = DateTime.Now;
@@ -147,7 +147,7 @@ namespace MarketLink.Services
             var order = await GetTrackedOrderAsync(id, farmerId);
             if (order == null || !(IsStatus(order, "placed") || IsStatus(order, "accepted"))) return false;
 
-            await AdjustReservedStockAsync(order, complete: false);
+            if (IsStatus(order, "accepted")) await AdjustReservedStockAsync(order, complete: false);
             order.Status = "cancelled";
             order.CancelReason = reason;
             order.CancelledAt = DateTime.Now;
@@ -177,6 +177,25 @@ namespace MarketLink.Services
             .Where(o => o.OrderId == id && o.Stall != null && o.Stall.FarmerId == farmerId)
             .Include(o => o.Items)
             .FirstOrDefaultAsync();
+
+        private async Task ReserveStockAsync(Order order)
+        {
+            var quantities = order.Items
+                .GroupBy(item => item.StockPriceId)
+                .Select(group => new { StockPriceId = group.Key, Quantity = group.Sum(item => item.Quantity) })
+                .ToList();
+
+            if (quantities.Count == 0) throw new InvalidOperationException("This order has no products to reserve.");
+
+            foreach (var line in quantities)
+            {
+                if (line.Quantity <= 0) throw new InvalidOperationException("This order contains an invalid quantity.");
+                var updated = await _context.StockPrices
+                    .Where(stock => stock.StockPriceId == line.StockPriceId && stock.StallId == order.StallId && stock.EffectiveTo == null && stock.QuantityIn - stock.QuantityReserved - stock.QuantitySold >= line.Quantity)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(stock => stock.QuantityReserved, stock => stock.QuantityReserved + line.Quantity));
+                if (updated != 1) throw new InvalidOperationException("Not enough available stock to accept this order. Check the product stock and price history.");
+            }
+        }
 
         private async Task AdjustReservedStockAsync(Order order, bool complete)
         {
