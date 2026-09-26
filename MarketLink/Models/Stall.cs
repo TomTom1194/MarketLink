@@ -28,6 +28,7 @@ namespace MarketLink.Models
         [Column("location_note")]
         public string? LocationNote { get; set; }
 
+        // Google Maps link to the stall
         [StringLength(500)]
         [Column("google_url")]
         public string? GoogleUrl { get; set; }

@@ -1,0 +1,34 @@
+@model CategoryFormDto
+@* Fields shared by Create.cshtml and Edit.cshtml *@
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <label asp-for="CategoryName" class="form-label"></label>
+        <input asp-for="CategoryName" class="form-control" placeholder="e.g. Leafy greens" />
+        <span asp-validation-for="CategoryName" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="ParentId" class="form-label"></label>
+        <select asp-for="ParentId" asp-items="ViewBag.Parents" class="form-select">
+            <option value="">-- None (top-level category) --</option>
+        </select>
+        <span asp-validation-for="ParentId" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="Slug" class="form-label"></label>
+        <input asp-for="Slug" class="form-control" placeholder="Leave empty to build it from the name" />
+        <div class="form-text">Used in links, e.g. /shop/leafy-greens</div>
+        <span asp-validation-for="Slug" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-6 d-flex align-items-center">
+        <div class="form-check">
+            <input asp-for="IsActive" class="form-check-input" />
+            <label asp-for="IsActive" class="form-check-label"></label>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,96 @@
+@model List<FarmerRowDto>
+@{
+    ViewData["Title"] = "Farmers";
+    Layout = "_AdminLayout";
+
+    string? status = ViewBag.Status;
+    string? search = ViewBag.Search;
+    var counts = (Dictionary<string, int>)ViewBag.Counts;
+    int total = counts.Values.Sum();
+
+    // Tabs: (value in database, label)
+    var tabs = new List<(string? Value, string Label)>
+    {
+        (null, "All"),
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("suspended", "Suspended")
+    };
+}
+
+<div class="toolbar">
+    <ul class="nav nav-pills">
+        @foreach (var tab in tabs)
+        {
+            int count = tab.Value == null ? total : counts.GetValueOrDefault(tab.Value);
+            <li class="nav-item">
+                <a class="nav-link @(status == tab.Value ? "active" : "")"
+                   asp-action="Index" asp-route-status="@tab.Value" asp-route-search="@search">
+                    @tab.Label <span class="badge bg-light text-dark ms-1">@count</span>
+                </a>
+            </li>
+        }
+    </ul>
+
+    <form method="get" asp-action="Index">
+        <input type="hidden" name="status" value="@status" />
+        <input type="search" name="search" value="@search" class="form-control" placeholder="Search brand, name, email, phone" />
+        <button type="submit" class="btn btn-outline-secondary">Search</button>
+    </form>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="admin-card text-muted">No farmers in this list.</div>
+}
+else
+{
+    <div class="admin-table">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Farm / brand</th>
+                <th>Contact</th>
+                <th>Market &amp; stall</th>
+                <th>Applied</th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var farmer in Model)
+            {
+                <tr>
+                    <td class="fw-semibold">@farmer.BrandName</td>
+                    <td>
+                        @farmer.ContactPerson<br />
+                        <span class="small text-muted">@farmer.Phone</span>
+                    </td>
+                    <td>
+                        @if (farmer.FirstStall == null)
+                        {
+                            <span class="small text-muted">No stall</span>
+                        }
+                        else
+                        {
+                            <span>@farmer.FirstStall.MarketName</span>
+                            @if (farmer.FirstStall.MarketIsNew)
+                            {
+                                <span class="status-pill status-pending ms-1">New market</span>
+                            }
+                            <br />
+                            <span class="small text-muted">Stall @farmer.FirstStall.StallCode</span>
+                        }
+                    </td>
+                    <td class="text-nowrap">@farmer.CreatedAt.ToString("dd/MM/yyyy")</td>
+                    <td><span class="status-pill status-@farmer.ApprovalStatus">@farmer.ApprovalStatus</span></td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" asp-action="Detail" asp-route-id="@farmer.FarmerId">View</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

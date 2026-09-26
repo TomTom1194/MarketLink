@@ -1,0 +1,84 @@
+@model MarketFormDto
+@* Fields shared by Create.cshtml and Edit.cshtml *@
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+
+<div class="row g-3">
+    <div class="col-12">
+        <label asp-for="MarketName" class="form-label"></label>
+        <input asp-for="MarketName" class="form-control" placeholder="e.g. Tan My Market" />
+        <span asp-validation-for="MarketName" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="CityId" class="form-label"></label>
+        <select asp-for="CityId" asp-items="ViewBag.Cities" class="form-select">
+            <option value="">-- Select a city --</option>
+        </select>
+        <span asp-validation-for="CityId" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="DistrictId" class="form-label"></label>
+        <select asp-for="DistrictId" asp-items="ViewBag.Districts" class="form-select">
+            <option value="">-- Select a district --</option>
+        </select>
+        <span asp-validation-for="DistrictId" class="text-danger small"></span>
+    </div>
+
+    <div class="col-12">
+        <label asp-for="MapUrl" class="form-label"></label>
+        <input asp-for="MapUrl" class="form-control" placeholder="https://maps.app.goo.gl/..." />
+        <div class="form-text">On Google Maps, open the market, press Share and copy the link.</div>
+        <span asp-validation-for="MapUrl" class="text-danger small"></span>
+    </div>
+
+    <div class="col-12">
+        <label asp-for="ImageFile" class="form-label"></label>
+        <input type="hidden" asp-for="ImageUrl" />
+        @if (!string.IsNullOrEmpty(Model.ImageUrl))
+        {
+            <div class="mb-2">
+                <img src="@Model.ImageUrl" alt="Current photo of @Model.MarketName" class="market-photo" />
+                <div class="form-text">Choose a new file to replace this photo.</div>
+            </div>
+        }
+        <input asp-for="ImageFile" type="file" accept=".jpg,.jpeg,.png,.webp" class="form-control" />
+        <div class="form-text">JPG, PNG or WEBP, up to 5 MB.</div>
+        <span asp-validation-for="ImageFile" class="text-danger small"></span>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label d-block">Market days</label>
+        <div class="day-checks">
+            @foreach (var day in MarketDays.Names)
+            {
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="OpenDays" value="@day.Key"
+                           id="day-@day.Key" checked="@Model.OpenDays.Contains(day.Key)" />
+                    <label class="form-check-label" for="day-@day.Key">@day.Value</label>
+                </div>
+            }
+        </div>
+        <span asp-validation-for="OpenDays" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-4">
+        <label asp-for="OpenTime" class="form-label"></label>
+        <input asp-for="OpenTime" type="time" asp-format="{0:hh\:mm}" class="form-control" />
+        <span asp-validation-for="OpenTime" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-4">
+        <label asp-for="CloseTime" class="form-label"></label>
+        <input asp-for="CloseTime" type="time" asp-format="{0:hh\:mm}" class="form-control" />
+        <span asp-validation-for="CloseTime" class="text-danger small"></span>
+    </div>
+
+    <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">
+            <input asp-for="IsActive" class="form-check-input" />
+            <label asp-for="IsActive" class="form-check-label"></label>
+        </div>
+    </div>
+</div>

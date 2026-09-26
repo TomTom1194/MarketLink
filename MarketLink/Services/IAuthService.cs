@@ -14,6 +14,9 @@ namespace MarketLink.Services
 
         Task<User> CreateUserAsync(string roleName, string email, string phone, string password);
 
+        // BCrypt hash of a password, e.g. when the admin approves a farmer
+        string HashPassword(string password);
+
         Task<User?> CheckLoginAsync(string emailOrPhone, string password);
 
         Task SignInAsync(HttpContext httpContext, User user, bool rememberMe);

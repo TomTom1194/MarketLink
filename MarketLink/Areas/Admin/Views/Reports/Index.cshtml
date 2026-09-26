@@ -1,0 +1,121 @@
+@model ReportDto
+@{
+    ViewData["Title"] = "Reports";
+    Layout = "_AdminLayout";
+
+    // Used to draw the bars: the biggest value fills the whole bar
+    decimal maxMarket = Model.RevenueByMarket.Count > 0 ? Model.RevenueByMarket.Max(r => r.Revenue) : 0;
+    decimal maxFarmer = Model.TopFarmers.Count > 0 ? Model.TopFarmers.Max(r => r.Revenue) : 0;
+
+    string[] statusOrder = { "placed", "accepted", "completed", "cancelled", "rejected", "no_show" };
+}
+
+<div class="toolbar">
+    <form method="get" asp-action="Index">
+        <label class="visually-hidden" for="from">From</label>
+        <input type="date" id="from" name="from" value="@Model.From.ToString("yyyy-MM-dd")" class="form-control" />
+        <span class="align-self-center text-muted">to</span>
+        <label class="visually-hidden" for="to">To</label>
+        <input type="date" id="to" name="to" value="@Model.To.ToString("yyyy-MM-dd")" class="form-control" />
+        <button type="submit" class="btn btn-outline-secondary">Show</button>
+    </form>
+    <span class="text-muted small">Revenue counts completed orders only (customers pay at the stall).</span>
+</div>
+
+<div class="stat-grid">
+    <div class="admin-card stat-card">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value">@Model.TotalRevenue.ToString("N0")</div>
+        <div class="stat-note">VND</div>
+    </div>
+    <div class="admin-card stat-card">
+        <div class="stat-label">Completed orders</div>
+        <div class="stat-value">@Model.CompletedOrders</div>
+        <div class="stat-note">@Model.From.ToString("dd/MM") – @Model.To.ToString("dd/MM/yyyy")</div>
+    </div>
+    <div class="admin-card stat-card">
+        <div class="stat-label">Orders placed</div>
+        <div class="stat-value">@Model.OrdersByStatus.Values.Sum()</div>
+        <div class="stat-note">
+            @foreach (var status in statusOrder.Where(s => Model.OrdersByStatus.ContainsKey(s)))
+            {
+                <span class="me-2">@status: @Model.OrdersByStatus[status]</span>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-6">
+        <h2 class="h5 mb-3">Revenue by market</h2>
+        @if (Model.RevenueByMarket.Count == 0)
+        {
+            <div class="admin-card text-muted">No completed orders in this period.</div>
+        }
+        else
+        {
+            <div class="admin-table">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Market</th>
+                        <th class="num">Orders</th>
+                        <th class="num">Revenue (VND)</th>
+                        <th style="width:30%"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.RevenueByMarket)
+                    {
+                        int percent = maxMarket == 0 ? 0 : (int)(row.Revenue * 100 / maxMarket);
+                        <tr>
+                            <td class="fw-semibold">@row.MarketName</td>
+                            <td class="num">@row.OrderCount</td>
+                            <td class="num">@row.Revenue.ToString("N0")</td>
+                            <td><div class="bar-track"><div class="bar-fill" style="width:@percent%"></div></div></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="col-xl-6">
+        <h2 class="h5 mb-3">Top 10 farmers</h2>
+        @if (Model.TopFarmers.Count == 0)
+        {
+            <div class="admin-card text-muted">No completed orders in this period.</div>
+        }
+        else
+        {
+            <div class="admin-table">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Farm / brand</th>
+                        <th class="num">Orders</th>
+                        <th class="num">Revenue (VND)</th>
+                        <th style="width:25%"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @for (int i = 0; i < Model.TopFarmers.Count; i++)
+                    {
+                        var row = Model.TopFarmers[i];
+                        int percent = maxFarmer == 0 ? 0 : (int)(row.Revenue * 100 / maxFarmer);
+                        <tr>
+                            <td class="text-muted">@(i + 1)</td>
+                            <td class="fw-semibold">@row.BrandName</td>
+                            <td class="num">@row.OrderCount</td>
+                            <td class="num">@row.Revenue.ToString("N0")</td>
+                            <td><div class="bar-track"><div class="bar-fill" style="width:@percent%"></div></div></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

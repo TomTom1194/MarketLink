@@ -61,6 +61,11 @@ namespace MarketLink.Controllers
                 return Redirect(returnUrl);
             }
 
+            if (user.Role!.RoleName == "admin")
+            {
+                return RedirectToAction("Index", "Dashboard", new { area = "Admin" });
+            }
+
             return RedirectToAction("Index", "Home");
         }
 
