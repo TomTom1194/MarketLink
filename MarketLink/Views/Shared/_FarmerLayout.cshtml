@@ -1,0 +1,259 @@
+@using System.Security.Claims
+@using MarketLink.Services.Farmer
+@inject IFarmerDashboardService DashboardService
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var isProfileSection = currentController == "Farmer" && (currentAction == "Profile" || currentAction == "Stalls");
+    var isProductSection = currentController == "FarmerProducts";
+    var farmerId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedFarmerId) ? parsedFarmerId : 0;
+    var dashboard = farmerId > 0 ? await DashboardService.GetDashboardAsync(farmerId) : new MarketLink.Dtos.FarmerDashboardDto();
+    var notifications = farmerId > 0 ? await DashboardService.GetOrderNotificationsAsync(farmerId) : new MarketLink.Dtos.FarmerOrderNotificationsDto();
+    var activePercent = dashboard.ProductCount == 0 ? 0 : dashboard.ActiveProductCount * 100 / dashboard.ProductCount;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - MarketLink Farmer</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <style>
+        :root { --farmer-green: #2d6a4f; --farmer-green-dark: #214f3b; --page-bg: #edf3ed; --muted: #778178; --line: #e8ece7; }
+        * { box-sizing: border-box; }
+        html, body { width: 100%; min-height: 100%; margin: 0; }
+        body { background: var(--page-bg); color: #253128; font-family: "Segoe UI", Arial, sans-serif; }
+        .farmer-shell { display: grid; grid-template-columns: 236px minmax(400px, 1fr) 400px; height: 100vh; min-height: 620px; overflow: hidden; }
+        .farmer-sidebar { position: relative; z-index: 2; display: flex; flex-direction: column; height: 100vh; padding: 22px 15px 16px; background: var(--farmer-green); color: #fff; }
+        .farmer-brand { display: flex; align-items: center; gap: 11px; padding: 2px 9px 20px; border-bottom: 1px solid #ffffff2b; }
+        .farmer-brand-icon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 12px; background: #ffffff24; font-size: 21px; }
+        .farmer-brand-title { font-size: 16px; font-weight: 700; }
+        .farmer-brand-subtitle { color: #d6e7dc; font-size: 11px; }
+        .farmer-nav-label { margin: 24px 10px 8px; color: #c4dbcb; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+        .farmer-nav { display: grid; gap: 5px; }
+        .farmer-nav-link { display: flex; align-items: center; gap: 11px; padding: 10px 11px; border-radius: 9px; color: #e7f1e9; font-size: 13px; text-decoration: none; transition: background .15s ease; }
+        .farmer-nav-link:hover, .farmer-nav-link.active { background: #ffffff20; color: #fff; }
+        .farmer-nav-icon { width: 20px; text-align: center; font-size: 16px; }
+        .farmer-subnav { display: grid; gap: 2px; margin: 1px 0 5px 39px; }
+        .farmer-subnav a { padding: 6px 8px; border-radius: 7px; color: #d6e7dc; font-size: 11px; text-decoration: none; }
+        .farmer-subnav a:hover, .farmer-subnav a.active { background: #ffffff18; color: #fff; }
+        .farmer-sidebar-bottom { margin-top: auto; padding-top: 14px; border-top: 1px solid #ffffff2b; }
+        .farmer-user { display: flex; align-items: center; gap: 10px; padding: 7px 8px 12px; }
+        .farmer-avatar { display: grid; width: 37px; height: 37px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #ffffff2b; }
+        .farmer-user-name { font-size: 12px; font-weight: 650; }
+        .farmer-user-role { color: #d6e7dc; font-size: 10px; }
+        .farmer-logout { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 8px; border: 0; background: transparent; color: #e7f1e9; font-size: 12px; text-align: left; }
+        .farmer-logout:hover { color: #fff; }
+
+        .farmer-main { height: 100vh; overflow-y: auto; padding: 25px 28px 38px; background: var(--page-bg); scrollbar-color: #cbd5cc transparent; scrollbar-width: thin; }
+        .farmer-main-inner { width: 100%; max-width: 1120px; margin: 0 auto; }
+        .farmer-topbar { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+        .farmer-breadcrumb { margin: 0; color: var(--muted); font-size: 11px; }
+        .farmer-topbar-actions { display: flex; align-items: center; gap: 8px; }
+        .farmer-icon-button { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: #536057; }
+        .farmer-notification-count { position: absolute; top: -6px; right: -6px; min-width: 19px; padding: 1px 4px; border-radius: 10px; background: #c53030; color: #fff; font-size: 10px; text-align: center; }
+        .farmer-page-title { margin: 0; color: #253128; font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
+        .farmer-page-subtitle { margin: 6px 0 22px; color: var(--muted); font-size: 13px; }
+        .farmer-card { border: 1px solid var(--line); border-radius: 13px; background: #fff; box-shadow: 0 4px 15px #25312808; }
+        .farmer-card-title { margin: 0; font-size: 14px; font-weight: 700; }
+        .farmer-btn-primary { border-color: var(--farmer-green); background: var(--farmer-green); color: #fff; }
+        .farmer-btn-primary:hover { border-color: var(--farmer-green-dark); background: var(--farmer-green-dark); color: #fff; }
+        .farmer-alert { border: 1px solid #f1dfb0; border-radius: 12px; background: #fff9e9; }
+
+        .farmer-dashboard { position: sticky; top: 14px; z-index: 1; align-self: start; max-height: calc(100vh - 28px); overflow-y: auto; margin: 14px 12px 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 4px 18px #2531280a; scrollbar-color: #cbd5cc transparent; scrollbar-width: thin; }
+        .farmer-dashboard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 17px; }
+        .farmer-dashboard-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+        .farmer-dashboard-head p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+        .farmer-dashboard-date { padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; color: #667168; font-size: 9px; white-space: nowrap; }
+        .farmer-welcome { padding: 13px; border-radius: 11px; background: #edf6ee; }
+        .farmer-welcome strong { display: block; margin-bottom: 4px; color: #264f38; font-size: 13px; }
+        .farmer-welcome p { margin: 0; color: #617367; font-size: 10px; line-height: 1.5; }
+        .farmer-stats { display: grid; gap: 8px; margin: 13px 0 20px; }
+        .farmer-stat { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+        .farmer-stat-icon { display: grid; width: 33px; height: 33px; place-items: center; border-radius: 9px; background: #f0f5ed; font-size: 15px; }
+        .farmer-stat-label { color: var(--muted); font-size: 9px; }
+        .farmer-stat-value { margin-top: 1px; color: #29352c; font-size: 16px; font-weight: 700; }
+        .farmer-dashboard-section { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 9px; font-size: 12px; font-weight: 700; }
+        .farmer-dashboard-section a { color: var(--farmer-green); font-size: 9px; font-weight: 600; text-decoration: none; }
+        .farmer-order-list { display: grid; gap: 7px; }
+        .farmer-order { padding: 9px; border: 1px solid var(--line); border-radius: 9px; }
+        .farmer-order-top { display: flex; justify-content: space-between; gap: 5px; font-size: 10px; font-weight: 650; }
+        .farmer-order-status { color: #a87524; font-size: 8px; white-space: nowrap; }
+        .farmer-chart-card { margin: 0 0 13px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+        .farmer-chart-title { margin: 0; font-size: 11px; font-weight: 700; }
+        .farmer-chart-caption { margin: 3px 0 10px; color: var(--muted); font-size: 9px; }
+        .farmer-dashboard-chart { padding-top: 10px; padding-bottom: 10px; }
+        .farmer-pie-row { display: flex; align-items: center; gap: 14px; }
+        .farmer-pie-chart { display: grid; width: 82px; height: 82px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #e8ece7; }
+        .farmer-pie-hole { display: grid; width: 50px; height: 50px; place-items: center; border-radius: 50%; background: #fff; color: #29352c; font-size: 13px; font-weight: 700; }
+        .farmer-pie-legend { display: grid; gap: 7px; color: #667168; font-size: 9px; }
+        .farmer-pie-legend span { display: flex; align-items: center; gap: 5px; }
+        .farmer-pie-swatch { width: 8px; height: 8px; border-radius: 3px; background: #2d6a4f; }
+        .farmer-pie-swatch.secondary { background: #93c5a1; }
+        .farmer-order-meta { margin-top: 4px; color: var(--muted); font-size: 9px; }
+        .farmer-quick-actions { display: grid; gap: 7px; margin-top: 18px; }
+        .farmer-quick-link { padding: 9px 10px; border: 1px solid #dce8dd; border-radius: 8px; background: #fff; color: var(--farmer-green-dark); font-size: 10px; font-weight: 600; text-decoration: none; }
+        .farmer-quick-link:hover { background: #f5faf5; color: var(--farmer-green-dark); }
+
+        @@media (max-width: 1120px) {
+            .farmer-shell { grid-template-columns: 220px minmax(380px, 1fr); }
+            .farmer-dashboard { display: none; }
+        }
+        @@media (max-width: 700px) {
+            .farmer-shell { display: block; height: auto; min-height: 100vh; overflow: visible; }
+            .farmer-sidebar { position: sticky; top: 0; width: 100%; height: auto; padding: 10px 12px; }
+            .farmer-brand { padding: 1px 5px 9px; }
+            .farmer-nav-label, .farmer-sidebar-bottom, .farmer-subnav { display: none; }
+            .farmer-nav { display: flex; overflow-x: auto; gap: 3px; padding-top: 7px; }
+            .farmer-nav-link { flex: 0 0 auto; padding: 8px; font-size: 11px; }
+            .farmer-main { height: auto; min-height: calc(100vh - 112px); overflow: visible; padding: 18px 13px 30px; }
+            .farmer-page-title { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="farmer-shell">
+        <aside class="farmer-sidebar">
+            <a class="farmer-brand text-decoration-none text-white" asp-controller="Farmer" asp-action="Index">
+                <span class="farmer-brand-icon">🌿</span>
+                <span><span class="farmer-brand-title d-block">MarketLink</span><span class="farmer-brand-subtitle">Farmer portal</span></span>
+            </a>
+
+            <div class="farmer-nav-label">Navigation</div>
+            <nav class="farmer-nav" aria-label="Navigation Farmer">
+                <a class="farmer-nav-link @(currentController == "Farmer" && currentAction == "Index" ? "active" : "")" asp-controller="Farmer" asp-action="Index">
+                    <span class="farmer-nav-icon">▦</span>Dashboard
+                </a>
+                <div>
+                    <a class="farmer-nav-link @(isProfileSection ? "active" : "")" asp-controller="Farmer" asp-action="Profile">
+                        <span class="farmer-nav-icon">◉</span>Profile &amp; stall
+                    </a>
+                    @if (isProfileSection)
+                    {
+                        <div class="farmer-subnav">
+                            <a class="@(currentAction == "Profile" ? "active" : "")" asp-controller="Farmer" asp-action="Profile">Farm profile</a>
+                            <a class="@(currentAction == "Stalls" ? "active" : "")" asp-controller="Farmer" asp-action="Stalls">Stall location</a>
+                        </div>
+                    }
+                </div>
+                <a class="farmer-nav-link @(isProductSection ? "active" : "")" asp-controller="FarmerProducts" asp-action="Index">
+                    <span class="farmer-nav-icon">▣</span>Products &amp; stock
+                </a>
+                <a class="farmer-nav-link @(currentController == "Farmer" && currentAction == "Orders" ? "active" : "")" asp-controller="Farmer" asp-action="Orders">
+                    <span class="farmer-nav-icon">▤</span>Orders
+                </a>
+            </nav>
+
+            <div class="farmer-sidebar-bottom">
+                <div class="farmer-user">
+                    <span class="farmer-avatar">👨‍🌾</span>
+                    <span><span class="farmer-user-name d-block">@User.Identity?.Name</span><span class="farmer-user-role">Farmer account</span></span>
+                </div>
+                <form method="post" asp-controller="Account" asp-action="Logout">
+                    @Html.AntiForgeryToken()
+                    <button class="farmer-logout" type="submit"><span class="farmer-nav-icon">↪</span>Log out</button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="farmer-main">
+            <div class="farmer-main-inner">
+                <header class="farmer-topbar">
+                    <p class="farmer-breadcrumb">Farmer portal&nbsp; / &nbsp;@ViewData["Title"]</p>
+                    <div class="farmer-topbar-actions">
+                        <div class="dropdown">
+                            <button class="farmer-icon-button position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Order notifications">🔔<span id="farmer-notification-count" class="farmer-notification-count" hidden="@(notifications.Count == 0)">@notifications.Count</span></button>
+                            <div class="dropdown-menu dropdown-menu-end p-2" style="min-width: 280px; max-height: 350px; overflow-y: auto">
+                                <div class="fw-bold small px-2 py-1">New orders awaiting confirmation</div>
+                                <div id="farmer-notification-list">
+                                    @if (notifications.Count == 0) { <div class="small text-muted px-2 py-2">No new orders.</div> }
+                                    @foreach (var order in notifications.Orders)
+                                    {
+                                        <a class="dropdown-item small" asp-controller="Farmer" asp-action="Orders" asp-route-status="placed">@order.OrderCode · @order.PickupName</a>
+                                    }
+                                </div>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item small text-success" asp-controller="Farmer" asp-action="Orders">View all orders</a>
+                            </div>
+                        </div>
+                        <span class="small text-muted">@User.Identity?.Name</span>
+                    </div>
+                </header>
+
+                @RenderBody()
+            </div>
+        </main>
+
+        <aside class="farmer-dashboard" aria-label="Dashboard overview">
+            <div class="farmer-dashboard-head">
+                <div><h2>Dashboard</h2><p>Activity overview</p></div>
+                <span class="farmer-dashboard-date">Today</span>
+            </div>
+            <div class="farmer-welcome">
+                <strong>Hello, @(string.IsNullOrWhiteSpace(dashboard.BrandName) ? User.Identity?.Name : dashboard.BrandName) 👋</strong>
+                <p>Here is your farm activity today.</p>
+            </div>
+            <div class="farmer-stats">
+                <div class="farmer-stat"><span class="farmer-stat-icon">🌱</span><span><span class="farmer-stat-label d-block">Total products</span><span class="farmer-stat-value">@dashboard.ProductCount</span></span></div>
+                <div class="farmer-stat"><span class="farmer-stat-icon">🏪</span><span><span class="farmer-stat-label d-block">Active stalls</span><span class="farmer-stat-value">@dashboard.ActiveStallCount</span></span></div>
+                <div class="farmer-stat"><span class="farmer-stat-icon">🧾</span><span><span class="farmer-stat-label d-block">Orders to review</span><span class="farmer-stat-value">@dashboard.PendingOrderCount</span></span></div>
+            </div>
+            <section class="farmer-chart-card farmer-dashboard-chart" aria-label="Product status chart">
+                <h3 class="farmer-chart-title">Product status</h3>
+                <p class="farmer-chart-caption">Share of your listed products</p>
+                <div class="farmer-pie-row">
+                    <div class="farmer-pie-chart" style="background: conic-gradient(#2d6a4f 0 @(activePercent)%, #93c5a1 @(activePercent)% 100%)"><div class="farmer-pie-hole">@dashboard.ProductCount</div></div>
+                    <div class="farmer-pie-legend">
+                        <span><i class="farmer-pie-swatch"></i>On sale · @dashboard.ActiveProductCount</span>
+                        <span><i class="farmer-pie-swatch secondary"></i>Hidden/expired · @dashboard.HiddenProductCount</span>
+                    </div>
+                </div>
+            </section>
+            <div class="farmer-dashboard-section">Recent orders <a asp-controller="Farmer" asp-action="Orders">View all →</a></div>
+            <div class="farmer-order-list">
+                @if (dashboard.RecentOrders.Count == 0) { <div class="small text-muted">No orders yet.</div> }
+                @foreach (var order in dashboard.RecentOrders)
+                {
+                    <a class="farmer-order text-decoration-none text-dark" asp-controller="Farmer" asp-action="Orders"><div class="farmer-order-top"><span>@order.OrderCode</span><span class="farmer-order-status">@(order.Status == "placed" ? "Awaiting confirmation" : order.Status == "accepted" ? "Ready for pickup" : order.Status == "completed" ? "Completed" : "Closed")</span></div><div class="farmer-order-meta">@order.PickupName · @order.PickupDate.ToString("dd/MM/yyyy")</div></a>
+                }
+            </div>
+            <div class="farmer-quick-actions">
+                <div class="farmer-dashboard-section">Quick actions</div>
+                <a class="farmer-quick-link" asp-controller="FarmerProducts" asp-action="Create">＋ Add a new product</a>
+                <a class="farmer-quick-link" asp-controller="Farmer" asp-action="Stalls">Manage stall</a>
+            </div>
+        </aside>
+    </div>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const farmerNotificationsUrl = '@Url.Action("OrderNotifications", "Farmer")';
+        async function refreshFarmerNotifications() {
+            try {
+                const response = await fetch(farmerNotificationsUrl, { credentials: 'same-origin' });
+                if (!response.ok) return;
+                const data = await response.json();
+                const count = document.getElementById('farmer-notification-count');
+                const list = document.getElementById('farmer-notification-list');
+                count.textContent = data.count;
+                count.hidden = data.count === 0;
+                list.replaceChildren();
+                if (data.count === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'small text-muted px-2 py-2';
+                    empty.textContent = 'No new orders.';
+                    list.appendChild(empty);
+                }
+                for (const order of data.orders) {
+                    const link = document.createElement('a');
+                    link.className = 'dropdown-item small';
+                    link.href = '@Url.Action("Orders", "Farmer", new { status = "placed" })';
+                    link.textContent = order.orderCode + ' · ' + order.pickupName;
+                    list.appendChild(link);
+                }
+            } catch { /* Keep current data if the connection is temporarily unavailable. */ }
+        }
+        setInterval(refreshFarmerNotifications, 30000);
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

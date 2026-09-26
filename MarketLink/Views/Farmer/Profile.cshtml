@@ -1,0 +1,95 @@
+﻿@model MarketLink.Dtos.UpdateFarmerProfileDto
+@{
+    ViewData["Title"] = "Farm profile";
+    Layout = "~/Views/Shared/_FarmerLayout.cshtml";
+    var approvalStatus = ViewBag.ApprovalStatus as string ?? "pending";
+    var approvalText = approvalStatus switch
+    {
+        "approved" => "Approved",
+        "rejected" => "Rejected",
+        "suspended" => "Suspended",
+        _ => "Pending approval"
+    };
+    var approvalClass = approvalStatus == "approved" ? "text-bg-success" : "text-bg-warning";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
+    <div>
+        <h1 class="farmer-page-title">Farm profile</h1>
+        <p class="farmer-page-subtitle">Information from your signed-in farmer account.</p>
+    </div>
+    <span class="badge rounded-pill @approvalClass">@approvalText</span>
+</div>
+
+@if (TempData["Success"] is string success)
+{
+    <div class="alert alert-success">@success</div>
+}
+
+<section class="farmer-card p-3 p-md-4">
+    <form asp-controller="Farmer" asp-action="Profile" method="post">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label asp-for="BrandName" class="form-label fw-semibold">Farm name</label>
+                <input asp-for="BrandName" class="form-control" />
+                <span asp-validation-for="BrandName" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="ContactPerson" class="form-label fw-semibold">Contact person</label>
+                <input asp-for="ContactPerson" class="form-control" />
+                <span asp-validation-for="ContactPerson" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="CityId" class="form-label fw-semibold">Province / city</label>
+                <select asp-for="CityId" asp-items="ViewBag.Cities" class="form-select" id="citySelect">
+                    <option value="">-- Select province / city --</option>
+                </select>
+                <span asp-validation-for="CityId" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="DistrictId" class="form-label fw-semibold">Ward / commune</label>
+                <select asp-for="DistrictId" asp-items="ViewBag.Districts" class="form-select" id="districtSelect">
+                    <option value="">-- Select ward / commune --</option>
+                </select>
+                <span asp-validation-for="DistrictId" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <label asp-for="Address" class="form-label fw-semibold">Street address</label>
+                <input asp-for="Address" class="form-control" />
+                <span asp-validation-for="Address" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <label asp-for="Description" class="form-label fw-semibold">About the farm</label>
+                <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+            <button type="submit" class="btn farmer-btn-primary">Save changes</button>
+            <a asp-controller="Farmer" asp-action="Stalls" class="btn btn-outline-secondary">Manage stall</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById('citySelect').addEventListener('change', async function () {
+            const districtSelect = document.getElementById('districtSelect');
+            districtSelect.innerHTML = '<option value="">-- Select ward / commune --</option>';
+            if (!this.value) return;
+
+            const response = await fetch(`/Account/GetDistricts?cityId=${encodeURIComponent(this.value)}`);
+            if (!response.ok) return;
+            const districts = await response.json();
+            for (const district of districts) {
+                const option = document.createElement('option');
+                option.value = district.districtId;
+                option.textContent = district.districtName;
+                districtSelect.appendChild(option);
+            }
+        });
+    </script>
+}

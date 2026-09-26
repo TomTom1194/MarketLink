@@ -1,0 +1,31 @@
+@model MarketLink.Dtos.FarmerDashboardDto
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "~/Views/Shared/_FarmerLayout.cshtml";
+}
+
+<section class="mb-4">
+    <h1 class="farmer-page-title">Hello, @(string.IsNullOrWhiteSpace(Model.BrandName) ? User.Identity?.Name : Model.BrandName)</h1>
+    <p class="farmer-page-subtitle">Your farm at a glance.</p>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4"><a class="farmer-card d-block p-3 text-decoration-none text-dark" asp-controller="FarmerProducts" asp-action="Index"><span class="small text-muted">Products</span><strong class="d-block fs-3 text-success">@Model.ProductCount</strong></a></div>
+    <div class="col-12 col-md-4"><a class="farmer-card d-block p-3 text-decoration-none text-dark" asp-controller="Farmer" asp-action="Stalls"><span class="small text-muted">Active stalls</span><strong class="d-block fs-3 text-success">@Model.ActiveStallCount</strong></a></div>
+    <div class="col-12 col-md-4"><a class="farmer-card d-block p-3 text-decoration-none text-dark" asp-controller="Farmer" asp-action="Orders" asp-route-status="placed"><span class="small text-muted">New orders awaiting confirmation</span><strong class="d-block fs-3 text-success">@Model.PendingOrderCount</strong></a></div>
+</div>
+
+<section class="farmer-card p-3 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="farmer-card-title">Recent orders</h2><a asp-controller="Farmer" asp-action="Orders" class="small text-success">View all →</a></div>
+    @if (Model.RecentOrders.Count == 0) { <p class="small text-muted mb-0">No orders yet.</p> }
+    @foreach (var order in Model.RecentOrders)
+    {
+        <div class="d-flex justify-content-between border-top py-2 small"><span>@order.OrderCode · @order.PickupName</span><span>@order.PickupDate.ToString("dd/MM/yyyy")</span></div>
+    }
+</section>
+
+<div class="d-flex flex-wrap gap-2">
+    <a class="btn farmer-btn-primary" asp-controller="FarmerProducts" asp-action="Create">+ Add product</a>
+    <a class="btn btn-outline-success" asp-controller="Farmer" asp-action="Stalls">Manage stall</a>
+    <a class="btn btn-outline-success" asp-controller="Farmer" asp-action="Orders">View orders</a>
+</div>

@@ -2,6 +2,7 @@ using MarketLink.Data;
 using System.Globalization;
 using MarketLink.Services;
 using MarketLink.Services.Admin;
+using MarketLink.Services.Farmer;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,6 +31,10 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IFavoriteService, FavoriteService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IFarmerAccountService, FarmerAccountService>();
+builder.Services.AddScoped<IFarmerProfileService, FarmerProfileService>();
+builder.Services.AddScoped<IFarmerStallManagementService, FarmerStallManagementService>();
+builder.Services.AddScoped<IFarmerProductService, FarmerProductService>();
+builder.Services.AddScoped<IFarmerDashboardService, FarmerDashboardService>();
 
 // Email (settings in appsettings.json -> "EmailSettings")
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
@@ -66,6 +71,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthentication();   // must come before UseAuthorization

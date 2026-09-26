@@ -1,0 +1,128 @@
+@model MarketLink.Models.Product
+@{
+    ViewData["Title"] = "Price and stock";
+    Layout = "~/Views/Shared/_FarmerLayout.cshtml";
+    var history = ViewBag.StockHistory as List<MarketLink.Models.StockPrice> ?? new List<MarketLink.Models.StockPrice>();
+    var stall = ViewBag.Stall as FarmerStallResponseDto;
+    var currentStock = history.FirstOrDefault(item => item.EffectiveTo == null);
+    var latestStock = history.FirstOrDefault();
+    var expired = Model.ExpiresAt <= DateTime.Now;
+    var outOfStock = currentStock == null || currentStock.QuantityAvailable <= 0;
+    var canPostInitial = history.Count == 0 && stall?.IsActive == true;
+    var canChangePrice = currentStock != null && currentStock.QuantityAvailable > 0 && Model.Status == "active" && !expired;
+    var canReup = history.Count > 0 && stall?.IsActive == true && (expired || outOfStock);
+    var minimumReupDate = DateTime.Now.AddMinutes(1).ToString("yyyy-MM-ddTHH:mm");
+}
+
+<style>
+    .farmer-stock-table thead th { background: #dfeee3; color: #24543a; border-bottom: 1px solid #bad9c3; white-space: nowrap; }
+    .farmer-stock-table tbody tr:nth-child(even) > * { background: #f4faf5; }
+    .farmer-stock-table tbody tr:hover > * { background: #eaf5ec; }
+</style>
+
+<div class="mb-4">
+    <a asp-action="Index" class="small text-muted text-decoration-none">← Back to products</a>
+    <h1 class="farmer-page-title mt-2">Price and stock</h1>
+    <p class="farmer-page-subtitle mb-0">@Model.ProductName · @Model.Unit · Listing expires: @Model.ExpiresAt.ToString("dd/MM/yyyy HH:mm")</p>
+</div>
+
+<section class="farmer-card @(expired ? "border-danger" : "border-success") mb-4 p-3 p-md-4">
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+        @if (expired) { <span class="badge rounded-pill text-bg-danger">Listing expired · Re-up needed</span> }
+        else if (outOfStock && history.Count > 0) { <span class="badge rounded-pill text-bg-warning">Out of stock · Re-up available</span> }
+        else if (history.Count == 0) { <span class="badge rounded-pill text-bg-secondary">No price posted</span> }
+        else { <span class="badge rounded-pill text-bg-success">In stock</span> }
+        <span class="small text-muted">@(currentStock == null ? "No current listing" : $"Updated: {currentStock.EffectiveFrom:dd/MM/yyyy HH:mm}")</span>
+    </div>
+    <h2 class="h6 fw-bold">@(stall?.MarketName ?? "No stall") <span class="text-success">@(stall == null ? "" : $"· Stall {stall.StallCode}")</span></h2>
+    <div class="row g-3 mt-1">
+        <div class="col-4"><div class="small text-muted">Listed price</div><div class="fs-5 fw-bold text-success">@(latestStock == null ? "—" : latestStock.Price.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US")))</div><small class="text-muted">/ @Model.Unit</small></div>
+        <div class="col-4"><div class="small text-muted">Available</div><div class="fs-5 fw-bold">@(currentStock == null ? "—" : currentStock.QuantityAvailable.ToString("N2"))</div><small class="text-muted">@Model.Unit</small></div>
+        <div class="col-4"><div class="small text-muted">Sold this listing</div><div class="fs-5 fw-bold text-primary">@(currentStock == null ? "—" : currentStock.QuantitySold.ToString("N2"))</div><small class="text-muted">@Model.Unit</small></div>
+    </div>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-xl-4">
+        <section class="farmer-card h-100 overflow-hidden">
+            <div class="border-bottom bg-light p-3"><h2 class="farmer-card-title">Set initial price</h2><small class="text-muted">For products without a price history.</small></div>
+            <form asp-action="PostStock" method="post" class="p-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="ProductId" value="@Model.ProductId" />
+                <div class="small text-muted mb-2">Stall: @(stall?.StallCode ?? "No active stall")</div>
+                @if (expired && history.Count == 0) { <div class="small text-muted mb-2">Expiry is recalculated when you set the first price.</div> }
+                <div class="mb-2"><label class="form-label small fw-semibold" for="initialPrice">Sale price (USD / @Model.Unit)</label><input id="initialPrice" class="form-control form-control-sm" type="number" name="Price" min="1.00" max="9999999999.99" step="0.01" required /></div>
+                <div class="mb-3"><label class="form-label small fw-semibold" for="initialQuantity">Quantity added</label><input id="initialQuantity" class="form-control form-control-sm" type="number" name="QuantityIn" min="0.01" max="99999999.99" step="0.01" required /></div>
+                <button class="btn btn-sm farmer-btn-primary w-100" type="submit" disabled="@(!canPostInitial)">Post price</button>
+            </form>
+        </section>
+    </div>
+
+    <div class="col-12 col-xl-4">
+        <section class="farmer-card h-100 overflow-hidden">
+            <div class="border-bottom bg-warning-subtle p-3"><h2 class="farmer-card-title">Change price</h2><small class="text-muted">Carry remaining available stock into a new price listing.</small></div>
+            <form asp-action="ChangePrice" method="post" class="p-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="ProductId" value="@Model.ProductId" />
+                <div class="small text-muted mb-2">Current price: @(currentStock == null ? "None" : currentStock.Price.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US")))</div>
+                <div class="mb-3"><label class="form-label small fw-semibold" for="newPrice">New price (USD / @Model.Unit)</label><input id="newPrice" class="form-control form-control-sm" type="number" name="NewPrice" min="1.00" max="9999999999.99" step="0.01" required /></div>
+                <button class="btn btn-sm btn-warning w-100 fw-semibold" type="submit" disabled="@(!canChangePrice)">Update price</button>
+            </form>
+        </section>
+    </div>
+
+    <div class="col-12 col-xl-4" id="reup">
+        <section class="farmer-card h-100 overflow-hidden">
+            <div class="border-bottom bg-info-subtle p-3"><h2 class="farmer-card-title">Re-up product</h2><small class="text-muted">Use when the listing expires or stock runs out.</small></div>
+            <form asp-action="Reup" method="post" class="p-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="ProductId" value="@Model.ProductId" />
+                <div class="mb-2"><label class="form-label small fw-semibold" for="reupExpId">New listing period</label><select id="reupExpId" class="form-select form-select-sm" name="ExpId" asp-items="ViewBag.ExpiryOptions" required></select></div>
+                <div class="mb-2"><label class="form-label small fw-semibold" for="newExpiresAt">New expiry date and time</label><input id="newExpiresAt" class="form-control form-control-sm" type="datetime-local" name="NewExpiresAt" min="@minimumReupDate" step="60" required /></div>
+                <div class="small text-muted mb-2">SHORT: up to 24 hours. LONG: more than 24 hours, up to the configured duration.</div>
+                <div class="mb-3"><label class="form-label small fw-semibold" for="addedQuantity">Additional quantity (@Model.Unit)</label><input id="addedQuantity" class="form-control form-control-sm" type="number" name="AddedQuantity" min="0.01" max="99999999.99" step="0.01" required /></div>
+                <div class="small text-muted mb-2">Keep latest price: @(latestStock == null ? "No price yet" : latestStock.Price.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US")))</div>
+                <button class="btn btn-sm btn-info text-white w-100 fw-semibold" type="submit" disabled="@(!canReup)">Re-up and extend listing</button>
+            </form>
+        </section>
+    </div>
+</div>
+
+<section class="farmer-card overflow-hidden">
+    <div class="border-bottom p-3"><h2 class="farmer-card-title">Price and stock history</h2></div>
+    <div class="table-responsive">
+        <table class="table table-hover farmer-stock-table align-middle mb-0 small">
+            <thead class="table-light"><tr><th>Time</th><th>Price</th><th>Added</th><th>Reserved</th><th>Sold</th><th>Change type</th><th>Status</th></tr></thead>
+            <tbody>
+                @if (history.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">No price or stock history yet.</td></tr> }
+                @foreach (var item in history)
+                {
+                    <tr>
+                        <td>@item.EffectiveFrom.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@item.Price.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"))</td>
+                        <td>@item.QuantityIn.ToString("N2") @Model.Unit</td>
+                        <td>@item.QuantityReserved.ToString("N2") @Model.Unit</td>
+                        <td>@item.QuantitySold.ToString("N2") @Model.Unit</td>
+                        <td>@(item.ChangeType == "new" ? "Initial price" : item.ChangeType == "price_change" ? "Price change" : "Re-up")</td>
+                        <td>@(item.EffectiveTo == null ? "Current" : "Closed")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<script>
+    const reupExpiryInput = document.getElementById('newExpiresAt');
+    if (reupExpiryInput) {
+        const refreshMinimumExpiry = () => {
+            const nextMinute = new Date(Date.now() + 60_000);
+            nextMinute.setSeconds(0, 0);
+            const pad = value => String(value).padStart(2, '0');
+            reupExpiryInput.min = `${nextMinute.getFullYear()}-${pad(nextMinute.getMonth() + 1)}-${pad(nextMinute.getDate())}T${pad(nextMinute.getHours())}:${pad(nextMinute.getMinutes())}`;
+        };
+        refreshMinimumExpiry();
+        reupExpiryInput.addEventListener('focus', refreshMinimumExpiry);
+        setInterval(refreshMinimumExpiry, 30_000);
+    }
+</script>

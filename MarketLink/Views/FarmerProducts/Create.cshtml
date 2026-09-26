@@ -1,0 +1,77 @@
+@model CreateFarmerProductDto
+@{
+    ViewData["Title"] = "Add product";
+    Layout = "~/Views/Shared/_FarmerLayout.cshtml";
+}
+
+<div class="mb-4">
+    <a asp-action="Index" class="small text-muted text-decoration-none">← Back to products</a>
+    <h1 class="farmer-page-title mt-2">Add a new product</h1>
+    <p class="farmer-page-subtitle mb-0">Enter product details. You can set the initial price and quantity after saving.</p>
+</div>
+
+<section class="farmer-card p-3 p-md-4">
+    <form asp-action="Create" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        <div class="row g-4">
+            <div class="col-12 col-lg-7">
+                <div class="mb-3">
+                    <label asp-for="ProductName" class="form-label fw-semibold">Product name *</label>
+                    <input asp-for="ProductName" class="form-control" maxlength="150" />
+                    <span asp-validation-for="ProductName" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="CategoryId" class="form-label fw-semibold">Category *</label>
+                    <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-select"><option value="0">-- Select category --</option></select>
+                    <span asp-validation-for="CategoryId" class="text-danger small"></span>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <label asp-for="Unit" class="form-label fw-semibold">Unit *</label>
+                        <select asp-for="Unit" asp-items="ViewBag.Units" class="form-select">
+                            <option value="">-- Select unit --</option>
+                        </select>
+                        <span asp-validation-for="Unit" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label asp-for="ExpId" class="form-label fw-semibold">Listing period *</label>
+                        <select asp-for="ExpId" asp-items="ViewBag.ExpiryOptions" class="form-select"><option value="0">-- Select listing period --</option></select>
+                        <span asp-validation-for="ExpId" class="text-danger small"></span>
+                    </div>
+                </div>
+                <div class="alert alert-light border small">SHORT lasts 24 hours. LONG lasts the number of days configured by the system.</div>
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label fw-semibold">Product description</label>
+                    <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+                </div>
+            </div>
+            <div class="col-12 col-lg-5">
+                <label asp-for="Image" class="form-label fw-semibold">Product image *</label>
+                <div class="rounded-3 border border-2 bg-light p-3 text-center">
+                    <img id="imagePreview" class="d-none mb-3 rounded-3" style="max-height:190px;max-width:100%;object-fit:cover" alt="Image preview" />
+                    <input asp-for="Image" type="file" accept="image/jpeg,image/png,image/webp" class="form-control" />
+                    <small class="d-block text-muted mt-2">JPG, PNG, or WEBP; maximum 5 MB.</small>
+                </div>
+                <span asp-validation-for="Image" class="text-danger small"></span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 border-top pt-3 mt-3">
+            <button type="submit" class="btn farmer-btn-primary px-4">Add product</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById('Image').addEventListener('change', event => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const preview = document.getElementById('imagePreview');
+            preview.src = URL.createObjectURL(file);
+            preview.classList.remove('d-none');
+        });
+    </script>
+}
