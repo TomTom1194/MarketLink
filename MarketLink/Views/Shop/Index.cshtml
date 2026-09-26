@@ -4,29 +4,18 @@
     ViewData["Title"] = "Choose a market";
     Layout = "_ShopLayout";
     int? selectedMarketId = ViewBag.SelectedMarketId;
-    List<MarketDistanceDto>? nearestMarkets = ViewBag.NearestMarkets;
-    bool hasLocation = nearestMarkets != null;
+    List<MarketDistanceDto> marketList = ViewBag.MarketList;
+    PagerDto marketPager = ViewBag.MarketPager;
+    PagerDto districtPager = ViewBag.DistrictPager;
+    bool hasLocation = ViewBag.HasLocation;
     bool hasDistrictFilter = ViewBag.CityId != null || ViewBag.DistrictId != null;
-
-    List<MarketDistanceDto> marketList = new List<MarketDistanceDto>();
-    if (nearestMarkets != null)
-    {
-        marketList = nearestMarkets;
-    }
-    else if (ViewBag.AllMarkets != null)
-    {
-        foreach (Market m in ViewBag.AllMarkets)
-        {
-            marketList.Add(new MarketDistanceDto { Market = m });
-        }
-    }
 }
 
 <nav class="breadcrumb-ml" aria-label="Breadcrumb">
     <a asp-controller="Home" asp-action="Index">Home</a><span>›</span><strong>Choose a market</strong>
 </nav>
 
-<div class="card-box">
+<div class="card-box" id="nearby">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
         <div>
             <h1 class="title" style="margin-bottom:6px">Markets near you</h1>
@@ -39,10 +28,10 @@
                 <span class="muted" id="locationStatus">Allow location access to see the markets closest to you.</span>
             }
         </div>
-        <button type="button" class="btn-ml outline" onclick="useMyLocation()">@IconHelper.Icon("pin") @(hasLocation ? "Update my location" : "Use my location")</button>
+        <button type="button" class="btn-ml outline" id="locationButton" onclick="useMyLocation()">@IconHelper.Icon("pin") @(hasLocation ? "Update my location" : "Use my location")</button>
     </div>
 
-    @if (marketList.Count == 0)
+    @if (marketPager.TotalCount == 0)
     {
         <span class="muted">No markets yet.</span>
     }
@@ -57,7 +46,7 @@
                 {
                     if (s.IsActive) stallCount++;
                 }
-                <a class="market-card @(selectedMarketId == m.MarketId ? "on" : "")" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">
+                <div class="market-card @(selectedMarketId == m.MarketId ? "on" : "")">
                     @if (!string.IsNullOrEmpty(m.ImageUrl))
                     {
                         <img class="market-img" src="@m.ImageUrl" alt="@m.MarketName" loading="lazy" />
@@ -82,12 +71,13 @@
                     </span>
                     <span class="name">@m.MarketName</span>
                     <span class="muted">@IconHelper.Icon("calendar") @ShopHelper.DayNames(m.OpenDays) · @ShopHelper.Hours(m.OpenTime, m.CloseTime)</span>
-                    <span class="muted">@IconHelper.Icon("pin") @ShopHelper.MarketAddress(m)</span>
+                    <a class="muted map-link" href="@ShopHelper.MarketDirections(m)" target="_blank" rel="noopener" title="Get directions">@IconHelper.Icon("pin") @ShopHelper.MarketAddress(m)</a>
                     <span class="muted">@IconHelper.Icon("store") @stallCount @(stallCount == 1 ? "stall" : "stalls") selling</span>
-                    <span class="go">Shop this market ›</span>
-                </a>
+                    <a class="go" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">Shop this market ›</a>
+                </div>
             }
         </div>
+        <partial name="_Pager" model="marketPager" />
     }
 </div>
 
@@ -113,10 +103,10 @@
 
 @if (ViewBag.DistrictId != null)
 {
-    <div class="card-box">
+    <div class="card-box" id="districtMarkets">
         <h2 class="title" style="margin-bottom:14px">Markets in this district</h2>
 
-        @if (Model.Count == 0)
+        @if (districtPager.TotalCount == 0)
         {
             <div class="empty" style="border:none;padding:24px">
                 <span class="t">No markets here yet</span>
@@ -128,7 +118,7 @@
             <div class="market-grid">
                 @foreach (var m in Model)
                 {
-                    <a class="market-card @(selectedMarketId == m.MarketId ? "on" : "")" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">
+                    <div class="market-card @(selectedMarketId == m.MarketId ? "on" : "")">
                         @if (selectedMarketId == m.MarketId)
                         {
                             <span class="badge-ml badge-green" style="align-self:flex-start">@IconHelper.Icon("star", 14, true) Your current market</span>
@@ -139,11 +129,12 @@
                         }
                         <span class="name">@m.MarketName</span>
                         <span class="muted">@IconHelper.Icon("calendar") @ShopHelper.DayNames(m.OpenDays) · @ShopHelper.Hours(m.OpenTime, m.CloseTime)</span>
-                        <span class="muted">@IconHelper.Icon("pin") @ShopHelper.MarketAddress(m)</span>
-                        <span class="go">Shop this market ›</span>
-                    </a>
+                        <a class="muted map-link" href="@ShopHelper.MarketDirections(m)" target="_blank" rel="noopener" title="Get directions">@IconHelper.Icon("pin") @ShopHelper.MarketAddress(m)</a>
+                        <a class="go" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">Shop this market ›</a>
+                    </div>
                 }
             </div>
+            <partial name="_Pager" model="districtPager" />
         }
     </div>
 }
@@ -169,16 +160,19 @@
             }
 
             setLocationStatus("Finding your location...", false);
+            setButtonLoading(document.getElementById("locationButton"), "Finding your location...");
 
             navigator.geolocation.getCurrentPosition(
                 function (position) {
                     try { sessionStorage.removeItem("ml_location_denied"); } catch (e) { }
                     var lat = position.coords.latitude.toFixed(5);
                     var lng = position.coords.longitude.toFixed(5);
+                    setButtonLoading(document.getElementById("locationButton"), "Loading nearby markets...");
                     window.location.href = shopPageUrl + "?lat=" + lat + "&lng=" + lng;
                 },
                 function (error) {
                     try { sessionStorage.setItem("ml_location_denied", "1"); } catch (e) { }
+                    stopButtonLoading(document.getElementById("locationButton"));
                     if (error.code == 1) {
                         setLocationStatus("Location access was denied. Please choose your district below.", true);
                     } else {

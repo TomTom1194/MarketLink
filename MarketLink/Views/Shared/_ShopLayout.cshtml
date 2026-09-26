@@ -45,8 +45,8 @@
             <span>MarketLink</span>
         </a>
 
-        <form class="ml-search" asp-controller="Shop" asp-action="Products" method="get">
-            <input name="keyword" value="@Context.Request.Query["keyword"]" aria-label="Search" placeholder="What are you looking for today?" />
+        <form class="ml-search" asp-controller="Shop" asp-action="Search" method="get">
+            <input name="keyword" value="@Context.Request.Query["keyword"]" aria-label="Search all markets" placeholder="What are you looking for today?" required />
             <button type="submit">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>Search
             </button>
@@ -172,15 +172,8 @@
                 </div>
 
                 <div class="reserve-right">
-                    <div class="field">
-                        <label for="reserveDate">Pickup day</label>
-                        <select id="reserveDate" name="PickupDate" onchange="buildSlots()"></select>
-                    </div>
-
-                    <div class="field">
-                        <label>Pickup time</label>
-                        <div class="slot-list" id="reserveSlots"></div>
-                    </div>
+                    <div class="note-yellow">@IconHelper.Icon("clock") <span>You will choose the pickup day and time in the next step.</span></div>
+                    <div class="note-yellow" id="reserveNoDay" style="display:none">@IconHelper.Icon("alert") <span>This stall has no selling day in the next 7 days.</span></div>
 
                     <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #EEF1EF;padding-top:12px;margin-top:auto">
                         <span style="font-weight:700">Total</span>
@@ -198,9 +191,19 @@
     </div>
 
     <div class="modal-bg confirm-bg" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
-        <div class="modal-box" style="max-width:460px">
+        <div class="modal-box confirm-box">
             <span id="confirmTitle" style="font-size:20px;font-weight:800">Confirm your reservation</span>
             <div id="confirmBody" class="confirm-list"></div>
+            <div class="confirm-pickup">
+                <div class="field">
+                    <label for="confirmDate">Pickup day</label>
+                    <select id="confirmDate" onchange="buildConfirmSlots()"></select>
+                </div>
+                <div class="field">
+                    <label>Pickup time</label>
+                    <div class="slot-list" id="confirmSlots"></div>
+                </div>
+            </div>
             <div class="pay-note">@IconHelper.Icon("cash") No payment now – pay the farmer at pickup.</div>
             <div class="reserve-actions confirm-actions">
                 <button type="button" class="btn-ml grey btn-pad" onclick="closeConfirm()">Go back</button>

@@ -5,7 +5,7 @@
     Layout = "_ShopLayout";
 
     List<Cart> allCarts = ViewBag.AllCarts;
-    Dictionary<int, DateTime?> pickupDates = ViewBag.PickupDates ?? new Dictionary<int, DateTime?>();
+    List<DateTime> commonDates = ViewBag.CommonDates ?? new List<DateTime>();
     CheckoutDto? checkoutForm = ViewBag.CheckoutForm;
     List<string> cartNotices = ViewBag.CartNotices ?? new List<string>();
 
@@ -14,6 +14,7 @@
     decimal totalAmount = 0;
     int itemCount = 0;
     int skippedCount = 0;
+    var skippedItems = new List<CartItem>();
 
     if (Model != null)
     {
@@ -39,10 +40,13 @@
             else
             {
                 skippedCount++;
+                skippedItems.Add(item);
             }
         }
     }
     bool nothingToOrder = okItemsByStall.Count == 0;
+    bool noCommonDay = !nothingToOrder && commonDates.Count == 0;
+    string commonDateText = string.Join(",", commonDates.Select(d => d.ToString("yyyy-MM-dd")));
 }
 
 @if (Model == null || Model.Items.Count == 0)
@@ -65,8 +69,8 @@ else
         </div>
         <div class="muted" style="display:flex;gap:6px 16px;flex-wrap:wrap">
             <span><strong style="color:#0B7A3E">1</strong> Check items</span><span>›</span>
-            <span><strong style="color:#0B7A3E">2</strong> Pickup day is pre-selected</span><span>›</span>
-            <span><strong style="color:#0B7A3E">3</strong> Confirm</span>
+            <span><strong style="color:#0B7A3E">2</strong> Enter receiver</span><span>›</span>
+            <span><strong style="color:#0B7A3E">3</strong> Choose pickup time &amp; confirm</span>
         </div>
     </div>
 
@@ -115,7 +119,6 @@ else
                         subtotal = subtotal + it.StockPrice!.Price * it.Quantity;
                     }
                 }
-                DateTime? pickupDate = pickupDates.ContainsKey(stallId) ? pickupDates[stallId] : null;
 
                 <div class="group">
                     <div class="group-head">
@@ -186,14 +189,7 @@ else
                     {
                     <div class="group-foot">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px">
-                            @if (pickupDate != null)
-                            {
-                                <strong>Pickup · @pickupDate.Value.ToString("dddd, dd/MM")</strong>
-                            }
-                            else
-                            {
-                                <strong style="color:#B71C1C">No selling day in the next 7 days</strong>
-                            }
+                            <strong>Sells on @ShopHelper.DayNames(stall.SellingDays)</strong>
                             <span class="muted">Market open @ShopHelper.Hours(Model.Market.OpenTime, Model.Market.CloseTime)</span>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end">
@@ -223,11 +219,10 @@ else
                     {
                         subtotal = subtotal + it.StockPrice!.Price * it.Quantity;
                     }
-                    DateTime? pickupDate = pickupDates.ContainsKey(stallId) ? pickupDates[stallId] : null;
                     <div class="row-s">
                         <span style="display:flex;flex-direction:column">
                             <span style="font-weight:600">@stall.Farmer!.BrandName</span>
-                            <span style="color:#5F6B65">@(pickupDate != null ? pickupDate.Value.ToString("ddd dd/MM") : "–") · Stall @stall.StallCode</span>
+                            <span style="color:#5F6B65">Stall @stall.StallCode</span>
                         </span>
                         <strong>@ShopHelper.Money(subtotal)</strong>
                     </div>
@@ -239,8 +234,16 @@ else
                 <span class="total-big">@ShopHelper.Money(totalAmount)</span>
             </div>
 
-            <form asp-controller="Checkout" asp-action="PlaceOrder" method="post" style="display:flex;flex-direction:column;gap:10px;margin:0" data-confirm="cart" data-orders="@okItemsByStall.Count" data-market="@Model.Market.MarketName" data-total="@ShopHelper.Money(totalAmount)">
+            <form asp-controller="Checkout" asp-action="PlaceOrder" method="post" style="display:flex;flex-direction:column;gap:10px;margin:0" data-confirm="cart" data-orders="@okItemsByStall.Count" data-market="@Model.Market.MarketName" data-total="@ShopHelper.Money(totalAmount)" data-dates="@commonDateText" data-open="@Model.Market.OpenTime.ToString(@"hh\:mm")" data-close="@Model.Market.CloseTime.ToString(@"hh\:mm")" data-no-day="The farmers in your basket have no common selling day in the next 7 days.">
                 <input type="hidden" name="MarketId" value="@Model.MarketId" />
+                @foreach (var skipped in skippedItems)
+                {
+                    var skippedSp = skipped.StockPrice!;
+                    <input type="hidden" name="SkippedItemIds" value="@skipped.CartItemId" class="skip-item"
+                           data-name="@skippedSp.Product!.ProductName"
+                           data-qty="@ShopHelper.Qty(skipped.Quantity) @skippedSp.Product.Unit"
+                           data-reason="@(ShopHelper.ItemStatus(skippedSp) == "sold_out" ? "Sold out" : "No longer available")" />
+                }
                 <div class="field">
                     <label for="PickupName">Receiver name</label>
                     <input id="PickupName" name="PickupName" value="@checkoutForm?.PickupName" maxlength="100" required />
@@ -255,13 +258,17 @@ else
                 </div>
 
                 <div class="pay-note">@IconHelper.Icon("cash") Pay in person at pickup</div>
-                <button type="submit" class="btn-ml big" disabled="@nothingToOrder">CONFIRM RESERVATION</button>
+                <button type="submit" class="btn-ml big" disabled="@(nothingToOrder || noCommonDay)">CONFIRM RESERVATION</button>
                 @if (nothingToOrder)
                 {
                     <span class="stock-low">None of the items in your basket can be ordered right now.</span>
                 }
+                else if (noCommonDay)
+                {
+                    <span class="stock-low">The farmers in your basket have no common selling day in the next 7 days. Please remove some items and order them separately.</span>
+                }
             </form>
-            <span class="muted" style="line-height:1.5">The farmer will hold your items. You can cancel an order from “My orders” before pickup. No online payment.</span>
+            <span class="muted" style="line-height:1.5">The farmer will confirm your order. You can cancel an order from “My orders” before pickup. No online payment.</span>
         </aside>
     </div>
 }

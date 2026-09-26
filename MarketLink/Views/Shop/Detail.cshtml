@@ -15,6 +15,7 @@
     bool soldOut = available < 1;
     string currentPage = Context.Request.Path + Context.Request.QueryString;
     bool isLoggedIn = User.Identity != null && User.Identity.IsAuthenticated;
+    string pickupDateText = string.Join(",", pickupDates.Select(d => d.ToString("yyyy-MM-dd")));
 }
 
 <nav class="breadcrumb-ml" aria-label="Breadcrumb">
@@ -48,7 +49,7 @@
             }
         </div>
 
-        <form asp-controller="Checkout" asp-action="ReserveNow" method="post" style="display:flex;flex-direction:column;gap:16px;margin:0" data-confirm="reserve" data-name="@product.ProductName" data-unit="@product.Unit" data-price="@Model.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-stall="@(farmer.BrandName) · Stall @stall.StallCode · @market.MarketName">
+        <form asp-controller="Checkout" asp-action="ReserveNow" method="post" style="display:flex;flex-direction:column;gap:16px;margin:0" data-confirm="reserve" data-name="@product.ProductName" data-unit="@product.Unit" data-price="@Model.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-stall="@(farmer.BrandName) · Stall @stall.StallCode · @market.MarketName" data-dates="@pickupDateText" data-open="@market.OpenTime.ToString(@"hh\:mm")" data-close="@market.CloseTime.ToString(@"hh\:mm")" data-no-day="This stall has no selling day in the next 7 days.">
             <input type="hidden" name="StockPriceId" value="@Model.StockPriceId" />
             <input type="hidden" name="ReturnUrl" value="@currentPage" />
 
@@ -77,19 +78,7 @@
                 }
                 else
                 {
-                    <div class="field">
-                        <label for="detailDate">Pickup day</label>
-                        <select id="detailDate" name="PickupDate" onchange="buildDetailSlots()">
-                            @foreach (DateTime d in pickupDates)
-                            {
-                                <option value="@d.ToString("yyyy-MM-dd")">@(d == DateTime.Today ? "Today, " : "")@d.ToString("dddd dd/MM")</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Pickup time</label>
-                        <div class="slot-list" id="detailSlots"></div>
-                    </div>
+                    <span class="muted">Next pickup day: <strong>@(pickupDates[0] == DateTime.Today ? "Today, " : "")@pickupDates[0].ToString("dddd dd/MM")</strong>. You will choose the day and time when you confirm.</span>
                 }
             </div>
 
@@ -228,13 +217,5 @@
             button.innerText = "RESERVE NOW – " + formatMoney(detailPrice * value);
         }
 
-        function buildDetailSlots() {
-            var dateSelect = document.getElementById("detailDate");
-            if (!dateSelect) return;
-            buildSlotsFor(dateSelect, document.getElementById("detailSlots"), document.getElementById("detailReserveButton"),
-                "@market.OpenTime.ToString(@"hh\:mm")", "@market.CloseTime.ToString(@"hh\:mm")");
-        }
-
-        buildDetailSlots();
     </script>
 }

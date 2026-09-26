@@ -30,6 +30,25 @@ namespace MarketLink.Helpers
             return "ok";
         }
 
+        public const int MaxQuantity = 999;
+
+        public static string CheckQuantity(decimal quantity)
+        {
+            if (quantity < 1)
+            {
+                return "Quantity must be at least 1.";
+            }
+            if (quantity != Math.Floor(quantity))
+            {
+                return "Quantity must be a whole number.";
+            }
+            if (quantity > MaxQuantity)
+            {
+                return "You can order at most " + MaxQuantity + " of one product.";
+            }
+            return "";
+        }
+
         public static string Qty(decimal quantity)
         {
             return quantity.ToString("0.##");
@@ -187,20 +206,36 @@ namespace MarketLink.Helpers
             return "";
         }
 
+        public static string DirectionsLink(double lat, double lng)
+        {
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            return "https://www.google.com/maps/dir/?api=1&destination=" + lat.ToString(culture) + "," + lng.ToString(culture);
+        }
+
+        public static string MarketDirections(Market market)
+        {
+            double lat;
+            double lng;
+            if (CoordinatesFromMapUrl(market.MapUrl, out lat, out lng))
+            {
+                return DirectionsLink(lat, lng);
+            }
+            return market.MapUrl;
+        }
+
         public static string MapLink(Stall stall, Market market)
         {
             double lat;
             double lng;
-            if (CoordinatesFromMapUrl(stall.GoogleUrl, out lat, out lng) || CoordinatesFromMapUrl(market.MapUrl, out lat, out lng))
+            if (CoordinatesFromMapUrl(stall.GoogleUrl, out lat, out lng))
             {
-                var culture = System.Globalization.CultureInfo.InvariantCulture;
-                return "https://www.google.com/maps/dir/?api=1&destination=" + lat.ToString(culture) + "," + lng.ToString(culture);
+                return DirectionsLink(lat, lng);
             }
             if (!string.IsNullOrEmpty(stall.GoogleUrl))
             {
                 return stall.GoogleUrl;
             }
-            return market.MapUrl;
+            return MarketDirections(market);
         }
     }
 }

@@ -85,7 +85,9 @@
     }
     else
     {
-        <div class="market-grid">
+        <div class="carousel">
+            <button type="button" class="carousel-btn prev" onclick="scrollCarousel(this, -1)" aria-label="Previous markets">@IconHelper.Icon("chevron-left", 22)</button>
+            <div class="carousel-track">
             @foreach (var m in markets)
             {
                 int stallCount = 0;
@@ -93,7 +95,7 @@
                 {
                     if (s.IsActive) stallCount++;
                 }
-                <a class="market-card @(currentMarket != null && currentMarket.MarketId == m.MarketId ? "on" : "")" asp-controller="Shop" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">
+                <div class="market-card @(currentMarket != null && currentMarket.MarketId == m.MarketId ? "on" : "")">
                     @if (!string.IsNullOrEmpty(m.ImageUrl))
                     {
                         <img class="market-img" src="@m.ImageUrl" alt="@m.MarketName" loading="lazy" />
@@ -101,10 +103,13 @@
                     <span class="badge-ml badge-green" style="align-self:flex-start;height:26px;font-size:13px">@(m.District != null ? m.District.DistrictName : "")@(m.District != null && m.District.City != null ? ", " + m.District.City.CityName : "")</span>
                     <span class="name">@m.MarketName</span>
                     <span class="muted">@IconHelper.Icon("calendar") @ShopHelper.DayNames(m.OpenDays) · @ShopHelper.Hours(m.OpenTime, m.CloseTime)</span>
+                    <a class="muted map-link" href="@ShopHelper.MarketDirections(m)" target="_blank" rel="noopener" title="Get directions">@IconHelper.Icon("pin") @ShopHelper.MarketAddress(m)</a>
                     <span class="muted">@IconHelper.Icon("store") @stallCount @(stallCount == 1 ? "stall" : "stalls") selling</span>
-                    <span class="go">Shop this market ›</span>
-                </a>
+                    <a class="go" asp-controller="Shop" asp-action="SelectMarket" asp-route-marketId="@m.MarketId">Shop this market ›</a>
+                </div>
             }
+            </div>
+            <button type="button" class="carousel-btn next" onclick="scrollCarousel(this, 1)" aria-label="Next markets">@IconHelper.Icon("chevron-right", 22)</button>
         </div>
     }
 </div>

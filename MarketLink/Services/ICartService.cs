@@ -1,3 +1,4 @@
+using MarketLink.Dtos;
 using MarketLink.Models;
 
 namespace MarketLink.Services
@@ -17,5 +18,7 @@ namespace MarketLink.Services
         Task<string> UpdateQuantityAsync(int customerId, int cartItemId, decimal quantity);
 
         Task<bool> RemoveItemAsync(int customerId, int cartItemId);
+
+        Task<ReorderResultDto> ReorderAsync(int customerId, int orderId);
     }
 }

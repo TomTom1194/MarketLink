@@ -1,0 +1,138 @@
+@model List<PickupDayDto>
+@using MarketLink.Helpers
+@{
+    ViewData["Title"] = "Pickup schedule";
+    ViewData["AccountMenu"] = "orders";
+    Layout = "_AccountLayout";
+    int waitingCount = ViewBag.WaitingCount;
+    DateTime? selectedDay = ViewBag.SelectedDay;
+
+    string DayLabel(DateTime date)
+    {
+        string label = date.ToString("dddd dd/MM");
+        if (date == DateTime.Today)
+        {
+            label = "Today · " + label;
+        }
+        else if (date == DateTime.Today.AddDays(1))
+        {
+            label = "Tomorrow · " + label;
+        }
+        return label;
+    }
+}
+
+<h1 class="title">My orders</h1>
+
+<partial name="_OrderTabs" />
+
+@if (waitingCount > 0)
+{
+    <div class="note-yellow">
+        @IconHelper.Icon("clock")
+        <span>@waitingCount @(waitingCount == 1 ? "order is" : "orders are") waiting for the farmer to accept. It will appear here once accepted.</span>
+        <a style="margin-left:auto;white-space:nowrap" asp-action="Index" asp-route-status="placed">See @(waitingCount == 1 ? "it" : "them") ›</a>
+    </div>
+}
+
+@if (Model.Count == 0)
+{
+    <div class="empty">
+        <span class="icon">@IconHelper.Icon("calendar", 48)</span>
+        <span class="t">No pickups coming up</span>
+        <span class="d">When a farmer accepts your order, it shows up here grouped by day, market and pickup time.</span>
+        <a class="btn-ml" asp-controller="Shop" asp-action="Products">Browse products</a>
+    </div>
+}
+else
+{
+    <div class="sched">
+        @foreach (var day in Model)
+        {
+            if (day.Date != selectedDay)
+            {
+                continue;
+            }
+
+            <section class="sched-day">
+                @if (Model.Count > 1)
+                {
+                    <details class="day-picker">
+                        <summary aria-label="Choose pickup day">
+                            @IconHelper.Icon("calendar", 22)
+                            <span>@DayLabel(day.Date)</span>
+                            <span class="chev">@IconHelper.Icon("chevron-down", 20)</span>
+                        </summary>
+                        <div class="day-menu">
+                            @foreach (var option in Model)
+                            {
+                                bool isOn = option.Date == selectedDay;
+                                <a class="day-option @(isOn ? "on" : "")" asp-action="Schedule" asp-route-day="@option.Date.ToString("yyyy-MM-dd")" aria-current="@(isOn ? "true" : null)">@option.Date.ToString("dddd dd/MM")</a>
+                            }
+                        </div>
+                    </details>
+                }
+                else
+                {
+                    <h2>@DayLabel(day.Date)</h2>
+                }
+
+                @foreach (var group in day.Markets)
+                {
+                    var market = group.Market;
+                    <div class="sched-market">
+                        <div class="sched-market-head">
+                            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:200px">
+                                <a class="plain-link" style="font-size:17px;font-weight:800" asp-controller="Shop" asp-action="Products" asp-route-marketId="@market.MarketId">@market.MarketName</a>
+                                <a class="muted plain-link" href="@ShopHelper.MarketDirections(market)" target="_blank" rel="noopener" title="Get directions">@IconHelper.Icon("pin", 16) @ShopHelper.MarketAddress(market)</a>
+                            </span>
+                            <span class="sched-pay">Total at this market: <strong>@ShopHelper.Money(group.Total)</strong> in cash</span>
+                        </div>
+
+                        @foreach (var slot in group.Slots)
+                        {
+                            <div class="sched-slot">
+                                <div class="sched-slot-head">
+                                    <span class="time">@IconHelper.Icon("clock", 18) @ShopHelper.Hours(slot.PickupFrom, slot.PickupTo)</span>
+                                    <span class="muted">@slot.Orders.Count @(slot.Orders.Count == 1 ? "stall" : "stalls")</span>
+                                    <span style="margin-left:auto">Pay <strong style="color:#E53935">@ShopHelper.Money(slot.Total)</strong></span>
+                                </div>
+
+                                @foreach (var o in slot.Orders)
+                                {
+                                    var stall = o.Stall!;
+                                    <div class="sched-order">
+                                        <span class="stall-code">@stall.StallCode</span>
+                                        <span class="sched-info">
+                                            <span style="font-weight:700">@stall.Farmer!.BrandName</span>
+                                            @if (!string.IsNullOrEmpty(stall.LocationNote))
+                                            {
+                                                <span class="muted">@stall.LocationNote</span>
+                                            }
+                                            <ul class="sched-items">
+                                                @foreach (var it in o.Items)
+                                                {
+                                                    <li>
+                                                        <img src="@it.ImageUrl" alt="" loading="lazy" />
+                                                        <span class="name">@it.ProductName</span>
+                                                        <span class="qty">@ShopHelper.Qty(it.Quantity) @it.Unit</span>
+                                                        <span class="line-total">@ShopHelper.Money(it.UnitPrice * it.Quantity)</span>
+                                                    </li>
+                                                }
+                                            </ul>
+                                            <span class="muted">Order total <strong style="color:#1F2421">@ShopHelper.Money(o.TotalAmount)</strong></span>
+                                        </span>
+                                        <span class="sched-code">
+                                            <span class="order-code" title="Show this code to the farmer">@o.OrderCode</span>
+                                            <a asp-action="Detail" asp-route-id="@o.OrderId" style="font-size:14px;font-weight:700">Details ›</a>
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}

@@ -1,0 +1,78 @@
+@model PagerDto
+@{
+    string PageUrl(int pageNumber)
+    {
+        var query = new Dictionary<string, string?>();
+        foreach (var item in Context.Request.Query)
+        {
+            if (item.Key != Model.PageParam && !string.IsNullOrEmpty(item.Value.ToString()))
+            {
+                query[item.Key] = item.Value.ToString();
+            }
+        }
+        if (pageNumber > 1)
+        {
+            query[Model.PageParam] = pageNumber.ToString();
+        }
+        string url = Context.Request.Path + QueryString.Create(query).ToString();
+        if (Model.Anchor != "")
+        {
+            url = url + "#" + Model.Anchor;
+        }
+        return url;
+    }
+
+    int from = Model.Skip() + 1;
+    int to = Model.Skip() + Model.PageSize;
+    if (to > Model.TotalCount)
+    {
+        to = Model.TotalCount;
+    }
+}
+@if (Model.TotalPages > 1)
+{
+    <nav class="pager" aria-label="Pages">
+        @if (Model.Page > 1)
+        {
+            <a class="pg" href="@PageUrl(Model.Page - 1)" rel="prev">‹ Prev</a>
+        }
+        else
+        {
+            <span class="pg off">‹ Prev</span>
+        }
+
+        @{ bool dotsShown = false; }
+        @for (int i = 1; i <= Model.TotalPages; i++)
+        {
+            bool showNumber = i == 1 || i == Model.TotalPages || Math.Abs(i - Model.Page) <= 1;
+            if (showNumber)
+            {
+                dotsShown = false;
+                if (i == Model.Page)
+                {
+                    <span class="pg on" aria-current="page">@i</span>
+                }
+                else
+                {
+                    <a class="pg" href="@PageUrl(i)">@i</a>
+                }
+            }
+            else if (!dotsShown)
+            {
+                dotsShown = true;
+                <span class="pg-dots">…</span>
+            }
+        }
+
+        @if (Model.Page < Model.TotalPages)
+        {
+            <a class="pg" href="@PageUrl(Model.Page + 1)" rel="next">Next ›</a>
+        }
+        else
+        {
+            <span class="pg off">Next ›</span>
+        }
+
+        <span class="pg-info">Showing @from–@to of @Model.TotalCount</span>
+    </nav>
+}

@@ -20,5 +20,11 @@ namespace MarketLink.Dtos
         [StringLength(500, ErrorMessage = "Note must be at most 500 characters")]
         [Display(Name = "Note for the farmer")]
         public string? CustomerNote { get; set; }
+
+        public DateTime? PickupDate { get; set; }
+
+        public string? PickupSlot { get; set; }
+
+        public List<int> SkippedItemIds { get; set; } = new List<int>();
     }
 }
