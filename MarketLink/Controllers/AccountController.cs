@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using MarketLink.Dtos;
 using MarketLink.Models;
 using MarketLink.Services;
@@ -20,9 +21,11 @@ namespace MarketLink.Controllers
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
+            // Already logged in? Send them to the portal of their role
             if (User.Identity != null && User.Identity.IsAuthenticated)
             {
-                return RedirectToAction("Index", "Home");
+                string role = User.FindFirstValue(ClaimTypes.Role) ?? "";
+                return RedirectToPortal(role);
             }
 
             ViewData["ReturnUrl"] = returnUrl;
@@ -56,30 +59,26 @@ namespace MarketLink.Controllers
 
             await _authService.SignInAsync(HttpContext, user, model.RememberMe);
 
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            string role = user.Role!.RoleName;
+
+            // Customers go back to the shop page they came from (e.g. a product page)
+            if (role == "customer" && !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
 
-            if (user.Role!.RoleName == "admin")
-            {
-                return RedirectToAction("Index", "Dashboard", new { area = "Admin" });
-            }
-
-            if (user.Role.RoleName == "farmer")
-            {
-                return RedirectToAction("Index", "Orders");
-            }
-
-            return RedirectToAction("Index", "Home");
+            // Admins and farmers always start at their own portal
+            return RedirectToPortal(role);
         }
 
         [HttpGet]
         public async Task<IActionResult> Register()
         {
+            // Already logged in? Send them to the portal of their role
             if (User.Identity != null && User.Identity.IsAuthenticated)
             {
-                return RedirectToAction("Index", "Home");
+                string role = User.FindFirstValue(ClaimTypes.Role) ?? "";
+                return RedirectToPortal(role);
             }
 
             await LoadCitiesAndDistricts(null, null);
@@ -129,6 +128,25 @@ namespace MarketLink.Controllers
         public IActionResult AccessDenied()
         {
             return View();
+        }
+
+        // Sends each role to its own start page
+        private IActionResult RedirectToPortal(string role)
+        {
+            if (role == "admin")
+            {
+                // Admin portal: /Admin
+                return RedirectToAction("Index", "Dashboard", new { area = "Admin" });
+            }
+
+            if (role == "farmer")
+            {
+                // Farmer portal: /Orders
+                return RedirectToAction("Index", "Orders", new { area = "" });
+            }
+
+            // Customer: the shop home page
+            return RedirectToAction("Index", "Home", new { area = "" });
         }
 
         private async Task LoadCitiesAndDistricts(int? cityId, int? districtId)
