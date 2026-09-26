@@ -1,0 +1,28 @@
+@model FarmerStatisticsDto
+@{
+    ViewData["Title"] = "Thống kê đơn hàng";
+    ViewData["FarmerSection"] = "statistics";
+}
+<section class="farmer-page">
+    <div class="page-heading"><div><span class="eyebrow">TỔNG QUAN KINH DOANH</span><h1>Thống kê</h1><p>Số liệu tính từ các đơn hàng thuộc gian hàng của bạn.</p></div></div>
+    <div class="info-grid">
+        <div class="info-card"><span class="info-icon orange">…</span><div><small>Đơn đang chờ xử lý</small><strong>@Model.PendingOrders</strong><span class="sub-info">Chờ xác nhận hoặc khách đến nhận</span></div></div>
+        <div class="info-card"><span class="info-icon green">₫</span><div><small>Doanh thu đơn hoàn tất</small><strong>@Model.Revenue.ToString("N0")đ</strong><span class="sub-info">Tổng giá trị đơn có trạng thái hoàn thành</span></div></div>
+    </div>
+    <div class="content-card"><div class="card-heading"><div><h2>Mặt hàng bán chạy</h2><p>Xếp theo tổng số lượng trong các đơn hoàn tất.</p></div></div>
+        @if (Model.BestSellingProducts.Count == 0)
+        {
+            <div class="empty-state"><h2>Chưa có dữ liệu bán hàng</h2><p>Mặt hàng sẽ xuất hiện sau khi đơn được xác nhận hoàn tất.</p></div>
+        }
+        else
+        {
+            <div class="table-responsive"><table class="order-table"><thead><tr><th>#</th><th>Sản phẩm</th><th>Số lượng đã bán</th><th class="text-end">Doanh thu</th></tr></thead><tbody>
+            @for (var i = 0; i < Model.BestSellingProducts.Count; i++)
+            {
+                var product = Model.BestSellingProducts[i];
+                <tr><td class="row-number">@(i + 1)</td><td><strong>@product.ProductName</strong></td><td>@product.QuantitySold.ToString("0.##")</td><td class="text-end fw-semibold">@product.Revenue.ToString("N0")đ</td></tr>
+            }
+            </tbody></table></div>
+        }
+    </div>
+</section>
