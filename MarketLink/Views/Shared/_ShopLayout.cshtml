@@ -21,6 +21,11 @@
 
     string displayName = isLoggedIn ? User.Identity!.Name ?? "" : "";
     string initial = displayName.Length > 0 ? displayName.Substring(0, 1).ToUpper() : "?";
+
+    // Where the name in the header takes an admin or a farmer
+    string portalUrl = User.IsInRole("admin")
+        ? Url.Action("Index", "Dashboard", new { area = "Admin" })!
+        : Url.Action("Index", "Farmer", new { area = "" })!;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -79,14 +84,11 @@
             }
             else
             {
-                @if (User.IsInRole("farmer"))
-                {
-                    <a class="ml-head-link" asp-area="" asp-controller="Orders" asp-action="Index">Đơn hàng</a>
-                }
-                <span class="ml-head-link ml-user"><span class="ml-avatar">@initial</span><span class="txt ml-user-name">@displayName</span></span>
-                <form asp-controller="Account" asp-action="Logout" method="post" style="margin:0">
-                    <button type="submit" class="ml-head-link"><span class="txt">Log out</span>@IconHelper.Icon("logout")</button>
-                </form>
+                @* Admin / farmer: click your name to go to your portal *@
+                <a class="ml-head-link ml-user" href="@portalUrl" title="Go to your portal">
+                    <span class="ml-avatar">@initial</span><span class="txt ml-user-name">@displayName</span>
+                </a>
+
             }
         }
 
