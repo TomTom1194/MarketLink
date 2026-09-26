@@ -518,6 +518,6 @@ h2.title { margin: 0; font-size: 22px; font-weight: 800; }
 }
 
 /* Small text link under the hero button */
-.hero-link { align-self: flex-start; font-size: 15px; font-weight: 700; color: var(--green-dark);  text-underline-offset: 3px; 
+.hero-link { align-self: flex-start; font-size: 15px; font-weight: 700; color: var(--green-dark);  text-underline-offset: 3px;
 text-decoration: none}
 .hero-link:hover { color: var(--green); }

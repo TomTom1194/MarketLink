@@ -25,7 +25,7 @@
     // Where the name in the header takes an admin or a farmer
     string portalUrl = User.IsInRole("admin")
         ? Url.Action("Index", "Dashboard", new { area = "Admin" })!
-        : Url.Action("Index", "Orders", new { area = "" })!;
+        : Url.Action("Index", "Farmer", new { area = "" })!;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -88,7 +88,7 @@
                 <a class="ml-head-link ml-user" href="@portalUrl" title="Go to your portal">
                     <span class="ml-avatar">@initial</span><span class="txt ml-user-name">@displayName</span>
                 </a>
-                
+
             }
         }
 

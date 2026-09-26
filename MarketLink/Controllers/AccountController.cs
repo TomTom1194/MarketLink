@@ -141,8 +141,8 @@ namespace MarketLink.Controllers
 
             if (role == "farmer")
             {
-                // Farmer portal: /Orders
-                return RedirectToAction("Index", "Orders", new { area = "" });
+                // Farmer portal: /Farmer
+                return RedirectToAction("Index", "Farmer", new { area = "" });
             }
 
             // Customer: the shop home page
