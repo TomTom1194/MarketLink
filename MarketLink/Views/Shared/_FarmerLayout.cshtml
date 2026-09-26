@@ -6,9 +6,15 @@
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
     var isProfileSection = currentController == "Farmer" && (currentAction == "Profile" || currentAction == "Stalls");
     var isProductSection = currentController == "FarmerProducts";
+    // The order pages (OrdersController) are shown inside this layout too
+    var isOrderSection = currentController == "Orders" || (currentController == "Farmer" && currentAction == "Orders");
+    var isNotificationSection = currentController == "Notifications";
+    var isPasswordSection = currentController == "Account" && currentAction == "ChangePassword";
     var farmerId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedFarmerId) ? parsedFarmerId : 0;
     var dashboard = farmerId > 0 ? await DashboardService.GetDashboardAsync(farmerId) : new MarketLink.Dtos.FarmerDashboardDto();
     var notifications = farmerId > 0 ? await DashboardService.GetOrderNotificationsAsync(farmerId) : new MarketLink.Dtos.FarmerOrderNotificationsDto();
+    // Sold out / expired products that need a re-up
+    var productAlerts = farmerId > 0 ? await DashboardService.GetProductAlertsAsync(farmerId) : new List<MarketLink.Dtos.FarmerProductAlertDto>();
     var activePercent = dashboard.ProductCount == 0 ? 0 : dashboard.ActiveProductCount * 100 / dashboard.ProductCount;
 }
 <!DOCTYPE html>
@@ -18,6 +24,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - MarketLink Farmer</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    @if (isOrderSection || isNotificationSection)
+    {
+        @* Cards, tabs and tables used by the order and notification pages *@
+        <link rel="stylesheet" href="~/css/farmer-orders.css" asp-append-version="true" />
+    }
     <style>
         :root { --farmer-green: #2d6a4f; --farmer-green-dark: #214f3b; --page-bg: #edf3ed; --muted: #778178; --line: #e8ece7; }
         * { box-sizing: border-box; }
@@ -139,8 +150,16 @@
                 <a class="farmer-nav-link @(isProductSection ? "active" : "")" asp-controller="FarmerProducts" asp-action="Index">
                     <span class="farmer-nav-icon">▣</span>Products &amp; stock
                 </a>
-                <a class="farmer-nav-link @(currentController == "Farmer" && currentAction == "Orders" ? "active" : "")" asp-controller="Farmer" asp-action="Orders">
-                    <span class="farmer-nav-icon">▤</span>Orders
+                <div>
+                    <a class="farmer-nav-link @(isOrderSection ? "active" : "")" asp-controller="Orders" asp-action="Index">
+                        <span class="farmer-nav-icon">▤</span>Orders
+                    </a>
+                </div>
+                <a class="farmer-nav-link @(isNotificationSection ? "active" : "")" asp-controller="Notifications" asp-action="Index">
+                    <span class="farmer-nav-icon">✉</span>Notifications
+                </a>
+                <a class="farmer-nav-link @(isPasswordSection ? "active" : "")" asp-controller="Account" asp-action="ChangePassword">
+                    <span class="farmer-nav-icon">🔒</span>Change password
                 </a>
             </nav>
 
@@ -162,7 +181,7 @@
                     <p class="farmer-breadcrumb">Farmer portal&nbsp; / &nbsp;@ViewData["Title"]</p>
                     <div class="farmer-topbar-actions">
                         <div class="dropdown">
-                            <button class="farmer-icon-button position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Order notifications">🔔<span id="farmer-notification-count" class="farmer-notification-count" hidden="@(notifications.Count == 0)">@notifications.Count</span></button>
+                            <button class="farmer-icon-button position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Order notifications">🔔<span id="farmer-notification-count" class="farmer-notification-count" hidden="@(notifications.Count + productAlerts.Count == 0)">@(notifications.Count + productAlerts.Count)</span></button>
                             <div class="dropdown-menu dropdown-menu-end p-2" style="min-width: 280px; max-height: 350px; overflow-y: auto">
                                 <div class="fw-bold small px-2 py-1">New orders awaiting confirmation</div>
                                 <div id="farmer-notification-list">
@@ -172,6 +191,15 @@
                                         <a class="dropdown-item small" asp-controller="Farmer" asp-action="Orders" asp-route-status="placed">@order.OrderCode · @order.PickupName</a>
                                     }
                                 </div>
+                                @if (productAlerts.Count > 0)
+                                {
+                                    <div class="dropdown-divider"></div>
+                                    <div class="fw-bold small px-2 py-1">Products to re-up</div>
+                                    @foreach (var alert in productAlerts.Take(5))
+                                    {
+                                        <a class="dropdown-item small" asp-controller="FarmerProducts" asp-action="Reup" asp-route-id="@alert.ProductId">@alert.ProductName · @(alert.Kind == "expired" ? "expired" : "sold out")</a>
+                                    }
+                                }
                                 <div class="dropdown-divider"></div>
                                 <a class="dropdown-item small text-success" asp-controller="Farmer" asp-action="Orders">View all orders</a>
                             </div>
@@ -179,6 +207,9 @@
                         <span class="small text-muted">@User.Identity?.Name</span>
                     </div>
                 </header>
+
+                @* Messages after saving (products, stall, profile, orders) *@
+                <partial name="_FarmerAlerts" />
 
                 @RenderBody()
             </div>
@@ -234,8 +265,9 @@
                 const data = await response.json();
                 const count = document.getElementById('farmer-notification-count');
                 const list = document.getElementById('farmer-notification-list');
-                count.textContent = data.count;
-                count.hidden = data.count === 0;
+                const total = data.count + @productAlerts.Count;
+                count.textContent = total;
+                count.hidden = total === 0;
                 list.replaceChildren();
                 if (data.count === 0) {
                     const empty = document.createElement('div');

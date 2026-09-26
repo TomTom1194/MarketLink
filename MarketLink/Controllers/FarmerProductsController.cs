@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
+using MarketLink.Models;
 using MarketLink.Dtos;
 using MarketLink.Services;
 using MarketLink.Services.Farmer;
@@ -49,8 +50,8 @@ namespace MarketLink.Controllers
                 try
                 {
                     var product = await _products.CreateProductAsync(farmerId.Value, model);
-                    TempData["Success"] = "Product added. Set its initial price and quantity.";
-                    return RedirectToAction(nameof(Stock), new { id = product.ProductId });
+                    TempData["Success"] = "Product added. Enter its price and quantity to start selling.";
+                    return RedirectToAction(nameof(Edit), null, new { id = product.ProductId }, "stock");
                 }
                 catch (ValidationException exception) { ModelState.AddModelError(nameof(model.ProductName), exception.Message); }
                 catch (InvalidOperationException exception) { ModelState.AddModelError("", exception.Message); }
@@ -66,9 +67,18 @@ namespace MarketLink.Controllers
             if (farmerId == null) return Challenge();
             var product = await _products.GetProductAsync(farmerId.Value, id);
             if (product == null) return NotFound();
-            var model = new UpdateFarmerProductDto { ProductId = id, CategoryId = product.CategoryId, ProductName = product.ProductName, Description = product.Description, Unit = product.Unit };
+            var model = new UpdateFarmerProductDto
+            {
+                ProductId = id,
+                CategoryId = product.CategoryId,
+                ProductName = product.ProductName,
+                Description = product.Description,
+                Unit = product.Unit,
+                Price = product.StockPrices.FirstOrDefault(sp => sp.EffectiveTo == null)?.Price
+            };
             ViewBag.CurrentImageUrl = product.ImageUrl;
             await LoadOptionsAsync(product.CategoryId, null, product.Unit);
+            await LoadPriceStockAsync(farmerId.Value, product);
             return View(model);
         }
 
@@ -86,6 +96,14 @@ namespace MarketLink.Controllers
                 try
                 {
                     if (!await _products.UpdateProductAsync(farmerId.Value, model)) return NotFound();
+
+                    string? stockError = await UpdatePriceAndStockAsync(farmerId.Value, product, model);
+                    if (stockError != null)
+                    {
+                        TempData["Error"] = "Product details were saved, but the price & stock were not: " + stockError;
+                        return RedirectToAction(nameof(Edit), null, new { id = model.ProductId }, "stock");
+                    }
+
                     TempData["Success"] = "Product updated.";
                     return RedirectToAction(nameof(Index));
                 }
@@ -94,6 +112,7 @@ namespace MarketLink.Controllers
             }
             ViewBag.CurrentImageUrl = product.ImageUrl;
             await LoadOptionsAsync(model.CategoryId, null, model.Unit);
+            await LoadPriceStockAsync(farmerId.Value, product);
             return View(model);
         }
 
@@ -112,47 +131,35 @@ namespace MarketLink.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // Price & stock is now a section of the Edit page (old links still work)
         [HttpGet]
-        public async Task<IActionResult> Stock(int id)
+        public IActionResult Stock(int id)
+        {
+            return RedirectToAction(nameof(Edit), null, new { id }, "stock");
+        }
+
+        // Re-up page: only for a product that sold out or whose listing period is over
+        [HttpGet]
+        public async Task<IActionResult> Reup(int id)
         {
             var farmerId = GetFarmerId();
             if (farmerId == null) return Challenge();
             var product = await _products.GetProductAsync(farmerId.Value, id);
             if (product == null) return NotFound();
-            ViewBag.StockHistory = await _products.GetStockHistoryAsync(farmerId.Value, id);
-            ViewBag.Stall = (await _stalls.GetStallsAsync(farmerId.Value)).FirstOrDefault();
-            ViewBag.ExpiryOptions = await GetExpirySelectAsync(product.ExpId);
+
+            var current = product.StockPrices.FirstOrDefault(sp => sp.EffectiveTo == null);
+            bool expired = product.ExpiresAt <= DateTime.Now;
+            bool soldOut = current != null && current.QuantityAvailable <= 0;
+            if (!expired && !soldOut)
+            {
+                TempData["Error"] = "Re-up is only needed when the product sells out or its listing period is over. Update price & stock on this page instead.";
+                return RedirectToAction(nameof(Edit), null, new { id }, "stock");
+            }
+
+            var history = await _products.GetStockHistoryAsync(farmerId.Value, id);
+            ViewBag.LatestPrice = history.FirstOrDefault()?.Price;
+            ViewBag.Reason = expired ? "expired" : "sold_out";
             return View(product);
-        }
-
-        [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> PostStock(CreateInitialStockPriceDto model)
-        {
-            var farmerId = GetFarmerId();
-            if (farmerId == null) return Challenge();
-            if (!ModelState.IsValid) return RedirectToStockError(model.ProductId, ModelState[nameof(model.Price)]?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid price or quantity.");
-            try
-            {
-                await _products.CreateInitialStockPriceAsync(farmerId.Value, model);
-                TempData["Success"] = "Initial price and quantity posted.";
-            }
-            catch (InvalidOperationException exception) { TempData["Error"] = exception.Message; }
-            return RedirectToAction(nameof(Stock), new { id = model.ProductId });
-        }
-
-        [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> ChangePrice(ChangeFarmerProductPriceDto model)
-        {
-            var farmerId = GetFarmerId();
-            if (farmerId == null) return Challenge();
-            if (!ModelState.IsValid) return RedirectToStockError(model.ProductId, ModelState[nameof(model.NewPrice)]?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid new price.");
-            try
-            {
-                await _products.ChangePriceAsync(farmerId.Value, model);
-                TempData["Success"] = "Price updated.";
-            }
-            catch (InvalidOperationException exception) { TempData["Error"] = exception.Message; }
-            return RedirectToAction(nameof(Stock), new { id = model.ProductId });
         }
 
         [HttpPost, ValidateAntiForgeryToken]
@@ -160,20 +167,80 @@ namespace MarketLink.Controllers
         {
             var farmerId = GetFarmerId();
             if (farmerId == null) return Challenge();
-            if (!ModelState.IsValid) return RedirectToStockError(model.ProductId, "Invalid re-up expiry or quantity.");
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = ModelState.Values.SelectMany(v => v.Errors).FirstOrDefault()?.ErrorMessage ?? "Invalid re-up details.";
+                return RedirectToAction(nameof(Reup), new { id = model.ProductId });
+            }
             try
             {
                 await _products.ReupAsync(farmerId.Value, model);
-                TempData["Success"] = "Product re-upped.";
+                TempData["Success"] = "Product re-upped. It is on sale again.";
             }
-            catch (InvalidOperationException exception) { TempData["Error"] = exception.Message; }
-            return RedirectToAction(nameof(Stock), new { id = model.ProductId });
+            catch (InvalidOperationException exception)
+            {
+                TempData["Error"] = exception.Message;
+                return RedirectToAction(nameof(Reup), new { id = model.ProductId });
+            }
+            return RedirectToAction(nameof(Edit), null, new { id = model.ProductId }, "stock");
         }
 
         private int? GetFarmerId()
         {
             var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return int.TryParse(id, out var farmerId) ? farmerId : null;
+        }
+
+        // Price & stock fields of the edit form. Returns an error message, or null when fine.
+        //  - no price yet        -> post the first price and quantity
+        //  - listing running     -> change price and / or add stock (listing period unchanged)
+        //  - sold out or expired -> fields are locked; the farmer uses the Re-up page
+        private async Task<string?> UpdatePriceAndStockAsync(int farmerId, Product product, UpdateFarmerProductDto model)
+        {
+            bool nothingEntered = model.Price == null && model.AddedQuantity == 0;
+            var current = product.StockPrices.FirstOrDefault(sp => sp.EffectiveTo == null);
+            bool hasHistory = (await _products.GetStockHistoryAsync(farmerId, product.ProductId)).Count > 0;
+
+            try
+            {
+                if (!hasHistory)
+                {
+                    if (nothingEntered) return null;
+                    if (model.Price == null || model.AddedQuantity <= 0) return "Enter both a price and a quantity to start selling.";
+                    await _products.CreateInitialStockPriceAsync(farmerId, new CreateInitialStockPriceDto
+                    {
+                        ProductId = product.ProductId,
+                        Price = model.Price.Value,
+                        QuantityIn = model.AddedQuantity
+                    });
+                    return null;
+                }
+
+                if (current == null) return null;
+                bool priceChanged = model.Price != null && model.Price.Value != current.Price;
+                if (!priceChanged && model.AddedQuantity == 0) return null;
+
+                await _products.ChangePriceAsync(farmerId, new ChangeFarmerProductPriceDto
+                {
+                    ProductId = product.ProductId,
+                    NewPrice = model.Price ?? current.Price,
+                    AddedQuantity = model.AddedQuantity
+                });
+                return null;
+            }
+            catch (InvalidOperationException exception)
+            {
+                return exception.Message;
+            }
+        }
+
+        // Data for the "Price & stock" section of the Edit page
+        private async Task LoadPriceStockAsync(int farmerId, Product product)
+        {
+            ViewBag.Product = product;
+            ViewBag.StockHistory = await _products.GetStockHistoryAsync(farmerId, product.ProductId);
+            ViewBag.Stall = (await _stalls.GetStallsAsync(farmerId)).FirstOrDefault();
+            ViewBag.ExpiryOptions = await GetExpirySelectAsync(product.ExpId);
         }
 
         private async Task LoadOptionsAsync(int? categoryId = null, int? expId = null, string? unit = null)
@@ -200,12 +267,6 @@ namespace MarketLink.Controllers
         {
             TempData["Error"] = message;
             return RedirectToAction(action);
-        }
-
-        private IActionResult RedirectToStockError(int productId, string message)
-        {
-            TempData["Error"] = message;
-            return productId > 0 ? RedirectToAction(nameof(Stock), new { id = productId }) : RedirectToAction(nameof(Index));
         }
     }
 }

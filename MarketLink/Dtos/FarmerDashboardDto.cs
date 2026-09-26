@@ -24,3 +24,13 @@ public class FarmerOrderNotificationsDto
     public int Count { get; set; }
     public List<FarmerRecentOrderDto> Orders { get; set; } = new();
 }
+
+// A product the farmer should re-up: it sold out or its listing period is over.
+// Worked out from Products + Stock_Price every time (no rows are stored).
+public class FarmerProductAlertDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = "";
+    public string Kind { get; set; } = "";      // "sold_out" or "expired"
+    public DateTime Since { get; set; }          // when it expired / when the current price row started
+}

@@ -15,7 +15,7 @@ namespace MarketLink.Helpers
             {
                 return "unavailable";
             }
-            if (sp.Product == null || sp.Product.Status != "active" || sp.Product.ExpiresAt <= DateTime.Now)
+            if (sp.Product == null || sp.Product.ExpiresAt <= DateTime.Now)
             {
                 return "unavailable";
             }
@@ -23,9 +23,15 @@ namespace MarketLink.Helpers
             {
                 return "unavailable";
             }
+            // Checked before the product status: a sold-out product is hidden automatically,
+            // but the customer should still see "Sold out" rather than "No longer available"
             if (sp.QuantityAvailable < 1)
             {
                 return "sold_out";
+            }
+            if (sp.Product.Status != "active")
+            {
+                return "unavailable";
             }
             return "ok";
         }

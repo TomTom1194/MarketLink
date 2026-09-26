@@ -31,7 +31,7 @@ namespace MarketLink.Services
             _environment = environment;
         }
 
-        // Lấy danh mục đang hoạt động để hiển thị trên form.
+        // Load the active categories for the form.
         public async Task<List<ProductCategory>> GetCategoriesAsync()
         {
             return await _context.ProductCategories
@@ -40,7 +40,7 @@ namespace MarketLink.Services
                 .ToListAsync();
         }
 
-        // Danh sách đơn vị được quản lý trong bảng Product_Unit của SQL Server.
+        // The list of units is kept in the Product_Unit table in SQL Server.
         public Task<List<string>> GetUnitsAsync()
         {
             return _context.Database.SqlQueryRaw<string>(
@@ -48,7 +48,7 @@ namespace MarketLink.Services
                 .ToListAsync();
         }
 
-        // Lấy các loại thời hạn hợp lệ từ Product_Exp.
+        // Load the valid display periods from Product_Exp.
         public async Task<List<ProductExp>> GetExpiryOptionsAsync()
         {
             var expiryOptions = await _context.ProductExps
@@ -70,8 +70,8 @@ namespace MarketLink.Services
                 .ToList();
         }
 
-        // Farmer chỉ xem sản phẩm thuộc hồ sơ của mình.
-        // Sản phẩm đã xóa mềm sẽ không xuất hiện trong danh sách.
+        // A farmer only sees their own products.
+        // Soft-deleted products are not listed.
         public async Task<List<Product>> GetProductsAsync(int farmerId)
         {
             await EnsureFarmerCanManageAsync(farmerId);
@@ -109,8 +109,8 @@ namespace MarketLink.Services
             return product;
         }
 
-        // Tạo sản phẩm mới.
-        // FarmerId lấy từ tài khoản đăng nhập; hạn đăng bán tính theo Product_Exp.
+        // Create a new product.
+        // FarmerId comes from the logged-in account; the expiry date comes from Product_Exp.
         public async Task<Product> CreateProductAsync(
             int farmerId,
             CreateFarmerProductDto model)
@@ -149,7 +149,7 @@ namespace MarketLink.Services
                 ImageUrl = imageUrl,
                 PublishedAt = currentTime,
                 ExpiresAt = CalculateExpiryDate(currentTime, expiry),
-                Status = "hidden", // Chỉ hiện sau khi đã đăng giá và có hàng.
+                Status = "hidden", // Shown only after a price and stock are posted.
                 CreatedAt = currentTime
             };
 
@@ -159,8 +159,8 @@ namespace MarketLink.Services
             return product;
         }
 
-        // Sửa thông tin sản phẩm.
-        // Thao tác này không thay đổi ngày đăng hoặc ngày hết hạn.
+        // Edit the product details.
+        // This does not change the posted date or the expiry date.
         public async Task<bool> UpdateProductAsync(
             int farmerId,
             UpdateFarmerProductDto model)
@@ -201,7 +201,7 @@ namespace MarketLink.Services
             product.Unit = model.Unit.Trim();
             product.UpdatedAt = DateTime.Now;
 
-            // Chỉ thay ảnh nếu farmer đã chọn ảnh mới.
+            // Only replace the image if the farmer chose a new one.
             if (model.Image != null)
             {
                 product.ImageUrl = await SaveImageAsync(model.Image);
@@ -211,7 +211,7 @@ namespace MarketLink.Services
             return true;
         }
 
-        // Đổi trạng thái sản phẩm theo thao tác ẩn hoặc hiển thị.
+        // Hide or show the product.
         public async Task<bool> UpdateProductStatusAsync(
             int farmerId,
             UpdateFarmerProductStatusDto model)
@@ -257,7 +257,7 @@ namespace MarketLink.Services
             return true;
         }
 
-        // Đăng giá lần đầu cho sản phẩm tại sạp của farmer.
+        // Post the first price for a product at the farmer's stall.
         public async Task<StockPrice> CreateInitialStockPriceAsync(
             int farmerId,
             CreateInitialStockPriceDto model)
@@ -308,22 +308,26 @@ namespace MarketLink.Services
             return stockPrice;
         }
 
-        // Đổi giá: đóng dòng giá hiện tại và mở dòng giá mới.
-        // Lượng hàng còn bán được chuyển sang dòng giá mới.
+        // Edit product: update price and / or add stock while the listing is running.
+        // A sold-out or expired product must be re-upped instead (new price, stock and listing period).
+        // The current price row is closed and a new row is opened with:
+        //   price    = the new price
+        //   quantity = what was still for sale + the added quantity
+        // Quantities already reserved or sold stay on the old row.
         public async Task<bool> ChangePriceAsync(
             int farmerId,
             ChangeFarmerProductPriceDto model)
         {
             if (model.NewPrice < 1m) throw new InvalidOperationException("New price must be at least $1.00.");
+            if (model.AddedQuantity < 0) throw new InvalidOperationException("Added quantity cannot be negative.");
             await EnsureFarmerCanManageAsync(farmerId);
 
             var stallId = await GetFarmerActiveStallIdAsync(farmerId);
             var product = await GetOwnedProductAsync(farmerId, model.ProductId);
 
-            if (product.Status != "active" ||
-                product.ExpiresAt <= DateTime.Now)
+            if (product.ExpiresAt <= DateTime.Now)
             {
-                throw new InvalidOperationException("You can change the price only while the product is visible and the listing has not expired.");
+                throw new InvalidOperationException("This listing has expired. Use re-up to extend it.");
             }
 
             var currentStockPrice = await _context.StockPrices
@@ -336,41 +340,48 @@ namespace MarketLink.Services
 
             if (currentStockPrice == null)
             {
-                throw new InvalidOperationException("This product has no active price.");
+                throw new InvalidOperationException("This product has no price yet. Set the initial price first.");
+            }
+
+            bool priceChanged = model.NewPrice != currentStockPrice.Price;
+            if (!priceChanged && model.AddedQuantity == 0)
+            {
+                throw new InvalidOperationException("Nothing to update. Enter a new price or a quantity to add.");
             }
 
             var remainingQuantity = currentStockPrice.QuantityAvailable;
-
             if (remainingQuantity <= 0)
             {
-                throw new InvalidOperationException("This product is out of stock. Use re-up.");
+                throw new InvalidOperationException("This product is sold out. Use re-up to add stock, a new price and a new listing period.");
             }
+            var newQuantity = remainingQuantity + model.AddedQuantity;
+            if (newQuantity > 99999999.99m) throw new InvalidOperationException("Total quantity exceeds the storage limit.");
 
             var currentTime = DateTime.Now;
             currentStockPrice.EffectiveTo = currentTime;
 
-            var newStockPrice = new StockPrice
+            _context.StockPrices.Add(new StockPrice
             {
                 ProductId = product.ProductId,
                 StallId = stallId,
                 Price = model.NewPrice,
-                QuantityIn = remainingQuantity,
+                QuantityIn = newQuantity,
                 QuantityReserved = 0,
                 QuantitySold = 0,
-                ChangeType = "price_change",
+                ChangeType = priceChanged ? "price_change" : "restock",
                 EffectiveFrom = currentTime,
                 EffectiveTo = null,
                 CreatedBy = farmerId
-            };
+            });
 
-            _context.StockPrices.Add(newStockPrice);
+            product.UpdatedAt = currentTime;
+
             await _context.SaveChangesAsync();
-
             return true;
         }
 
-        // Re-up chỉ được thực hiện khi sản phẩm hết hạn hoặc hết hàng.
-        // Đóng dòng kho cũ, nhập thêm hàng và mở dòng restock mới.
+        // Re-up is only allowed when the product has expired or sold out.
+        // Close the old stock row, add the new stock and open a new restock row.
         public async Task<bool> ReupAsync(
             int farmerId,
             ReupFarmerProductDto model)
@@ -379,7 +390,6 @@ namespace MarketLink.Services
 
             var stallId = await GetFarmerActiveStallIdAsync(farmerId);
             var product = await GetOwnedProductAsync(farmerId, model.ProductId);
-            var expiry = await GetValidExpiryOptionAsync(model.ExpId);
             var currentTime = DateTime.Now;
 
             var currentStockPrice = await _context.StockPrices
@@ -410,10 +420,8 @@ namespace MarketLink.Services
                 throw new InvalidOperationException("Set the initial price before re-upping this product.");
             }
 
-            if (!model.NewExpiresAt.HasValue) throw new InvalidOperationException("Select a new expiry date and time.");
-            var newExpiryDate = model.NewExpiresAt.Value;
-            currentTime = DateTime.Now;
-            ValidateReupDate(newExpiryDate, expiry, currentTime);
+            if (model.NewPrice < 1m) throw new InvalidOperationException("Price must be at least $1.00.");
+            if (model.ExtendHours < 0 || model.ExtendHours > 24) throw new InvalidOperationException("Extra time must be between 0 and 24 hours.");
 
             var remainingQuantity = currentStockPrice?.QuantityAvailable ?? 0;
             if (remainingQuantity + model.AddedQuantity > 99999999.99m) throw new InvalidOperationException("Total quantity exceeds the storage limit.");
@@ -423,9 +431,20 @@ namespace MarketLink.Services
                 currentStockPrice.EffectiveTo = currentTime;
             }
 
-            product.ExpId = expiry.ExpId;
-            product.PublishedAt = currentTime;
-            product.ExpiresAt = newExpiryDate;
+            if (hasExpired)
+            {
+                // Case 1 - expired: a new 24-hour listing starts now (a SHORT listing)
+                var shortExpiry = await _context.ProductExps.FirstOrDefaultAsync(e => e.ExpCode == "SHORT");
+                if (shortExpiry != null) product.ExpId = shortExpiry.ExpId;
+                product.PublishedAt = currentTime;
+                product.ExpiresAt = currentTime.AddHours(24);
+            }
+            else
+            {
+                // Case 2 - sold out while the listing is still running:
+                // keep the listing and add 0 - 24 hours to it
+                product.ExpiresAt = product.ExpiresAt.AddHours(model.ExtendHours);
+            }
             product.Status = "active";
             product.UpdatedAt = currentTime;
 
@@ -433,7 +452,7 @@ namespace MarketLink.Services
             {
                 ProductId = product.ProductId,
                 StallId = stallId,
-                Price = latestStockPrice.Price,
+                Price = model.NewPrice,
                 QuantityIn = remainingQuantity + model.AddedQuantity,
                 QuantityReserved = 0,
                 QuantitySold = 0,
@@ -449,7 +468,7 @@ namespace MarketLink.Services
             return true;
         }
 
-        // Xem lịch sử giá và kho của sản phẩm thuộc farmer đang đăng nhập.
+        // Price and stock history of a product owned by the logged-in farmer.
         public async Task<List<StockPrice>> GetStockHistoryAsync(
             int farmerId,
             int productId)
@@ -463,7 +482,7 @@ namespace MarketLink.Services
                 .ToListAsync();
         }
 
-        // Điểm gọi cho phần đơn hàng sau khi cập nhật kho.
+        // Called by the order code after the stock is updated.
         public async Task HideIfUnavailableAsync(int productId)
         {
             var product = await _context.Products
@@ -586,41 +605,6 @@ namespace MarketLink.Services
             }
 
             return publishedAt.AddDays(expiry.DurationDays);
-        }
-
-        private static void ValidateReupDate(
-            DateTime newExpiryDate,
-            ProductExp expiry,
-            DateTime currentTime)
-        {
-            if (newExpiryDate.Date < currentTime.Date)
-            {
-                throw new InvalidOperationException("The expiry date cannot be in the past.");
-            }
-
-            if (newExpiryDate <= currentTime)
-            {
-                throw new InvalidOperationException("The expiry time must be later than the current server time.");
-            }
-
-            var maximumExpiryDate = CalculateExpiryDate(currentTime, expiry);
-
-            if (newExpiryDate > maximumExpiryDate)
-            {
-                var errorMessage = expiry.ExpCode.Equals("SHORT", StringComparison.OrdinalIgnoreCase)
-                    ? "SHORT cannot exceed 24 hours."
-                    : $"Expiry cannot exceed {expiry.DurationDays} days from re-up.";
-
-                throw new InvalidOperationException(errorMessage);
-            }
-
-            if (expiry.ExpCode.Equals(
-                    "LONG",
-                    StringComparison.OrdinalIgnoreCase) &&
-                newExpiryDate <= currentTime.AddHours(24))
-            {
-                throw new InvalidOperationException("LONG must exceed 24 hours.");
-            }
         }
 
         private async Task<string> SaveImageAsync(IFormFile? image)

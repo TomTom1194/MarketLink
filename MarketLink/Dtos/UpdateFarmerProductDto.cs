@@ -23,5 +23,15 @@ namespace MarketLink.Dtos
         public string Unit { get; set; } = "";
 
         public IFormFile? Image { get; set; }
+
+        // ----- Price & stock (the listing period does not change here) -----
+
+        // Price per unit. Empty = keep the current price.
+        [Range(typeof(decimal), "1.00", "9999999999.99", ErrorMessage = "Price must be at least $1.00.")]
+        public decimal? Price { get; set; }
+
+        // Quantity to add to the stock (0 = no new stock)
+        [Range(typeof(decimal), "0", "99999999.99", ErrorMessage = "Added quantity cannot be negative.")]
+        public decimal AddedQuantity { get; set; }
     }
 }

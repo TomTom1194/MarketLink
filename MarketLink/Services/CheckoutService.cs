@@ -173,6 +173,13 @@ namespace MarketLink.Services
                 .ThenInclude(s => s!.Farmer)
                 .FirstOrDefaultAsync(x => x.StockPriceId == model.StockPriceId);
 
+            if (sp != null && sp.EffectiveTo != null
+                && await _context.StockPrices.AnyAsync(x => x.ProductId == sp.ProductId && x.StallId == sp.StallId && x.EffectiveTo == null))
+            {
+                result.Errors.Add("The farmer has just updated the price or stock of this product. Please reload the page and check the new price.");
+                return result;
+            }
+
             if (sp == null || sp.EffectiveTo != null || sp.Product!.Status != "active" || sp.Product.ExpiresAt <= DateTime.Now
                 || !sp.Stall!.IsActive || sp.Stall.Farmer!.ApprovalStatus != "approved")
             {
@@ -290,6 +297,19 @@ namespace MarketLink.Services
             foreach (var item in cart.Items)
             {
                 var sp = item.StockPrice!;
+
+                // The farmer changed the price or stock after the basket page was loaded:
+                // the old price row is closed. Ask the customer to look at the basket again
+                // (opening the basket moves the item to the new price and shows what changed).
+                if (sp.EffectiveTo != null)
+                {
+                    bool stillOnSale = await _context.StockPrices.AnyAsync(x => x.ProductId == sp.ProductId && x.StallId == sp.StallId && x.EffectiveTo == null);
+                    if (stillOnSale)
+                    {
+                        result.Errors.Add(sp.Product!.ProductName + ": the farmer has just updated the price or stock. Please check your basket again before ordering.");
+                        continue;
+                    }
+                }
 
                 string status = ShopHelper.ItemStatus(sp);
                 if (status != "ok")

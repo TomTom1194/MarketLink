@@ -1,12 +1,32 @@
 @model IReadOnlyList<NotificationDto>
-@{ ViewData["Title"] = "Thông báo"; var unreadCount = (int)(ViewBag.UnreadCount ?? 0); }
+@{ ViewData["Title"] = "Notifications"; ViewData["AccountMenu"] = "notifications"; var unreadCount = (int)(ViewBag.UnreadCount ?? 0); }
 <section class="farmer-page notifications-page">
-    <div class="page-heading"><div><span class="eyebrow">CẬP NHẬT MỚI NHẤT</span><h1>Thông báo</h1><p>Bạn có @unreadCount thông báo chưa đọc.</p></div>@if (unreadCount > 0) { <form asp-action="MarkAllRead" method="post"><button class="mark-read" type="submit">✓ Đánh dấu đã đọc</button></form> }</div>
-    <div class="order-tabs notification-tabs"><button class="order-tab active" data-notification-filter="all">Tất cả <span>@Model.Count</span></button><button class="order-tab" data-notification-filter="orders">Đơn hàng</button></div>
+    <div class="page-heading"><div><span class="eyebrow">LATEST UPDATES</span><h1>Notifications</h1><p>You have @unreadCount unread @(unreadCount == 1 ? "notification" : "notifications").</p></div>@if (unreadCount > 0) { <form asp-action="MarkAllRead" method="post"><button class="mark-read" type="submit">✓ Mark all as read</button></form> }</div>
+    <div class="order-tabs notification-tabs"><button class="order-tab active" data-notification-filter="all">All <span>@Model.Count</span></button><button class="order-tab" data-notification-filter="orders">Orders</button></div>
+    @{ var productAlerts = (List<FarmerProductAlertDto>)ViewBag.ProductAlerts; }
+    @if (productAlerts.Count > 0)
+    {
+        @* Sold out / expired products (worked out from Products + Stock_Price) *@
+        <div class="notification-list" style="margin-bottom:18px">
+            @foreach (var alert in productAlerts)
+            {
+                bool expired = alert.Kind == "expired";
+                <article class="notification-card unread">
+                    <span class="notification-icon orange">@(expired ? "⏱" : "∅")</span>
+                    <div class="notification-copy">
+                        <div class="notification-title">@alert.ProductName @(expired ? "listing has expired" : "is sold out")</div>
+                        <p>@(expired ? "It is hidden from the shop." : "Customers can no longer order it.") Re-up with a new price, stock and listing period.</p>
+                    </div>
+                    <time datetime="@alert.Since.ToString("O")">@alert.Since.ToString("dd/MM/yyyy · HH:mm")</time>
+                    <a asp-controller="FarmerProducts" asp-action="Reup" asp-route-id="@alert.ProductId" aria-label="Re-up product">›</a>
+                </article>
+            }
+        </div>
+    }
     <div class="notification-list">
         @if (Model.Count == 0)
         {
-            <div class="empty-state"><span class="empty-icon">♧</span><h2>Chưa có thông báo</h2><p>Thông báo về đơn hàng sẽ xuất hiện tại đây.</p></div>
+            <div class="empty-state"><span class="empty-icon">♧</span><h2>No notifications yet</h2><p>Updates about your orders will appear here.</p></div>
         }
         @foreach (var notification in Model)
         {
@@ -16,7 +36,7 @@
                 <span class="notification-icon @iconClass">@icon</span>
                 <div class="notification-copy"><div class="notification-title">@notification.Title @if (!notification.IsRead) { <span class="unread-dot"></span> }</div><p>@notification.Message</p></div>
                 <time datetime="@notification.CreatedAt.ToString("O")">@notification.CreatedAt.ToString("dd/MM/yyyy · HH:mm")</time>
-                @if (notification.OrderId.HasValue) { <a asp-controller="@(User.IsInRole("customer") ? "MyOrders" : "Orders")" asp-action="@(User.IsInRole("customer") ? "Detail" : "Details")" asp-route-id="@notification.OrderId" aria-label="Xem đơn hàng">›</a> }
+                @if (notification.OrderId.HasValue) { <a asp-controller="@(User.IsInRole("customer") ? "MyOrders" : "Orders")" asp-action="@(User.IsInRole("customer") ? "Detail" : "Details")" asp-route-id="@notification.OrderId" aria-label="View order">›</a> }
             </article>
         }
     </div>

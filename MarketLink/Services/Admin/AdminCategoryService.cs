@@ -156,7 +156,7 @@ namespace MarketLink.Services.Admin
                 : model.Slug.Trim().ToLower();
         }
 
-        // "Rau củ & Đồ khô" -> "rau-cu-do-kho"
+        // e.g. "Rau củ & Đồ khô" (Vegetables & Dry goods) -> "rau-cu-do-kho"
         private static string MakeSlug(string text)
         {
             string lower = text.Trim().ToLower().Replace("đ", "d");

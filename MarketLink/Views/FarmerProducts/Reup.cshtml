@@ -1,0 +1,93 @@
+@model MarketLink.Models.Product
+@{
+    ViewData["Title"] = "Re-up product";
+    Layout = "~/Views/Shared/_FarmerLayout.cshtml";
+
+    bool expired = (string)ViewBag.Reason == "expired";
+    decimal? latestPrice = ViewBag.LatestPrice as decimal?;
+}
+
+<div class="mb-4">
+    <a asp-action="Edit" asp-route-id="@Model.ProductId" class="small text-muted text-decoration-none">← Back to the product</a>
+    <h1 class="farmer-page-title mt-2">Re-up @Model.ProductName</h1>
+    <p class="farmer-page-subtitle mb-0">
+        @if (expired)
+        {
+            <text>The listing period ended on @Model.ExpiresAt.ToString("dd/MM/yyyy HH:mm"), so the product is hidden from the shop.</text>
+        }
+        else
+        {
+            <text>This product is sold out.</text>
+        }
+        Set a new price and stock to put it back on sale.
+    </p>
+</div>
+
+<section class="farmer-card p-3 p-md-4" style="max-width:720px">
+    <form asp-action="Reup" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="ProductId" value="@Model.ProductId" />
+
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold" for="NewPrice">New price (USD / @Model.Unit) *</label>
+                <input id="NewPrice" name="NewPrice" type="number" min="1.00" max="9999999999.99" step="0.01" class="form-control" required
+                       value="@(latestPrice?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))" />
+                <small class="text-muted">Last price: @(latestPrice == null ? "—" : ShopHelper.Money(latestPrice.Value))</small>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold" for="AddedQuantity">New stock (@Model.Unit) *</label>
+                <input id="AddedQuantity" name="AddedQuantity" type="number" min="0.01" max="99999999.99" step="0.01" class="form-control" required />
+            </div>
+            @if (expired)
+            {
+                @* Case 1 - expired: no period to choose, 24 hours from now *@
+                <div class="col-12">
+                    <div class="alert alert-info mb-0">
+                        The product will be listed again for <strong>24 hours</strong>,
+                        until <strong>@DateTime.Now.AddHours(24).ToString("dd/MM/yyyy HH:mm")</strong>.
+                    </div>
+                </div>
+            }
+            else
+            {
+                @* Case 2 - sold out: keep the listing and add 0 - 24 hours *@
+                <div class="col-12 col-md-6">
+                    <label class="form-label fw-semibold" for="ExtendHours">Extra listing time</label>
+                    <select id="ExtendHours" name="ExtendHours" class="form-select" data-expires="@Model.ExpiresAt.ToString("yyyy-MM-ddTHH:mm:ss")">
+                        @for (int h = 0; h <= 24; h++)
+                        {
+                            <option value="@h">@(h == 0 ? "No extra time" : "+" + h + (h == 1 ? " hour" : " hours"))</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="form-label fw-semibold">Shown on the website until</div>
+                    <div class="form-control bg-light" id="newExpiry">@Model.ExpiresAt.ToString("dd/MM/yyyy HH:mm")</div>
+                    <small class="text-muted">Current end: @Model.ExpiresAt.ToString("dd/MM/yyyy HH:mm")</small>
+                </div>
+            }
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 border-top pt-3 mt-4">
+            <button type="submit" class="btn farmer-btn-primary px-4">Re-up and put on sale</button>
+            <a asp-action="Edit" asp-route-id="@Model.ProductId" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <script>
+        // Sold out: show the new end time when the farmer picks extra hours
+        const hours = document.getElementById('ExtendHours');
+        if (hours) {
+            const baseEnd = new Date(hours.dataset.expires);
+            const pad = value => String(value).padStart(2, '0');
+            hours.addEventListener('change', () => {
+                const end = new Date(baseEnd.getTime() + Number(hours.value) * 3600_000);
+                document.getElementById('newExpiry').textContent =
+                    `${pad(end.getDate())}/${pad(end.getMonth() + 1)}/${end.getFullYear()} ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+            });
+        }
+    </script>
+}

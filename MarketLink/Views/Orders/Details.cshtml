@@ -1,9 +1,161 @@
 @model OrderDetailDto
-@{ ViewData["Title"] = "Chi tiết đơn hàng"; ViewData["FarmerSection"] = "orders"; var status = Model.Status.ToLowerInvariant(); var statusText = status switch { "placed" => "Chờ xác nhận", "accepted" => "Đã xác nhận", "completed" => "Hoàn thành", "rejected" => "Đã từ chối", "cancelled" => "Đã hủy", "no_show" => "Không đến nhận", _ => Model.Status }; var statusClass = status switch { "placed" => "pending", "accepted" => "accepted", "completed" => "completed", "rejected" or "cancelled" => "cancelled", _ => "shipping" }; }
+@{
+    ViewData["Title"] = "Order details";
+
+    string status = Model.Status.ToLowerInvariant();
+    string statusText = status switch
+    {
+        "placed" => "Waiting for confirmation",
+        "accepted" => "Confirmed · Waiting for pickup",
+        "completed" => "Completed",
+        "rejected" => "Rejected",
+        "cancelled" => "Cancelled",
+        "no_show" => "No-show",
+        _ => Model.Status
+    };
+    string statusClass = status switch
+    {
+        "placed" => "pending",
+        "accepted" => "accepted",
+        "completed" => "completed",
+        "rejected" or "cancelled" => "cancelled",
+        _ => "shipping"
+    };
+}
+
 <section class="farmer-page">
-    <a class="back-link" asp-action="Index">← <span>Quay lại danh sách</span></a>
-    <div class="page-heading detail-heading"><div><span class="eyebrow">THÔNG TIN ĐƠN HÀNG</span><h1>Chi tiết đơn hàng <span class="muted-code">#@Model.OrderCode</span></h1></div><span class="status-pill @statusClass"><i></i>@statusText</span></div>
-    <div class="info-grid"><div class="info-card"><span class="info-icon green">♙</span><div><small>Khách hàng</small><strong>@Model.CustomerName</strong><span class="sub-info">SĐT: @Model.CustomerPhone</span></div></div><div class="info-card"><span class="info-icon blue">▦</span><div><small>Ngày nhận hàng</small><strong>@Model.ReceiveDate.ToString("dd/MM/yyyy · HH:mm")</strong><span class="sub-info">Khung giờ khách đã chọn</span></div></div><div class="info-card"><span class="info-icon orange">⌖</span><div><small>Địa chỉ</small><strong>@Model.Address</strong></div></div></div>
-    <div class="content-card"><div class="card-heading"><div><h2>Danh sách sản phẩm</h2><p>@Model.Items.Count sản phẩm trong đơn hàng</p></div></div><div class="table-responsive"><table class="order-table"><thead><tr><th>STT</th><th>Sản phẩm</th><th>Số lượng</th><th>Đơn giá</th><th class="text-end">Thành tiền</th></tr></thead><tbody>@for (var i = 0; i < Model.Items.Count; i++) { var item = Model.Items[i]; <tr><td class="row-number">@((i + 1).ToString("00"))</td><td><div class="product-cell"><span class="food-thumb">@if (!string.IsNullOrWhiteSpace(item.ImageUrl)) { <img src="@item.ImageUrl" alt="@item.ProductName" /> } else { <span>🥬</span> }</span><strong>@item.ProductName</strong></div></td><td>@item.Quantity.ToString("0.##") @item.Unit</td><td>@item.UnitPrice.ToString("N0")đ</td><td class="text-end fw-semibold">@item.TotalPrice.ToString("N0")đ</td></tr> }</tbody></table></div><div class="totals"><div><span>Tổng cộng</span><strong>@Model.TotalProductAmount.ToString("N0")đ</strong></div><div><span>Phí giao hàng / điều chỉnh</span><strong>@Model.ShippingFee.ToString("N0")đ</strong></div><div class="grand-total"><span>Thành tiền</span><strong>@Model.TotalAmount.ToString("N0")đ</strong></div></div></div>
-    <div class="detail-footer"><a class="btn-soft" asp-action="Index">← Quay lại danh sách</a>@if (status == "placed" || status == "accepted") { <a class="btn-primary-green" asp-action="Process" asp-route-id="@Model.Id">Xử lý đơn hàng <span>→</span></a> }</div>
+    <a class="back-link" asp-action="Index">← <span>Back to list</span></a>
+
+    <div class="page-heading detail-heading">
+        <div>
+            <span class="eyebrow">ORDER INFORMATION</span>
+            <h1>Order details <span class="muted-code">#@Model.OrderCode</span></h1>
+        </div>
+        <span class="status-pill @statusClass"><i></i>@statusText</span>
+    </div>
+
+    <div class="process-layout">
+        @* ===== Left: customer, pickup time and products ===== *@
+        <div class="process-summary">
+            <div class="info-grid compact">
+                <div class="info-card">
+                    <span class="info-icon green">♙</span>
+                    <div><small>Customer</small><strong>@Model.CustomerName</strong><span class="sub-info">Phone: @Model.CustomerPhone</span></div>
+                </div>
+                <div class="info-card">
+                    <span class="info-icon blue">▦</span>
+                    <div><small>Pickup date</small><strong>@Model.ReceiveDate.ToString("dd/MM/yyyy · HH:mm")</strong><span class="sub-info">@Model.Address</span></div>
+                </div>
+            </div>
+
+            <div class="content-card">
+                <div class="card-heading">
+                    <div><h2>Products</h2><p>@Model.Items.Count @(Model.Items.Count == 1 ? "product" : "products") in this order</p></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="order-table">
+                        <thead>
+                            <tr><th>No.</th><th>Product</th><th>Quantity</th><th>Unit price</th><th class="text-end">Amount</th></tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < Model.Items.Count; i++)
+                            {
+                                var item = Model.Items[i];
+                                <tr>
+                                    <td class="row-number">@((i + 1).ToString("00"))</td>
+                                    <td>
+                                        <div class="product-cell">
+                                            <span class="food-thumb">
+                                                @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
+                                                {
+                                                    <img src="@item.ImageUrl" alt="@item.ProductName" />
+                                                }
+                                                else
+                                                {
+                                                    <span>🥬</span>
+                                                }
+                                            </span>
+                                            <strong>@item.ProductName</strong>
+                                        </div>
+                                    </td>
+                                    <td>@item.Quantity.ToString("0.##") @item.Unit</td>
+                                    <td>@ShopHelper.Money(item.UnitPrice)</td>
+                                    <td class="text-end fw-semibold">@ShopHelper.Money(item.TotalPrice)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="totals">
+                    <div><span>Subtotal</span><strong>@ShopHelper.Money(Model.TotalProductAmount)</strong></div>
+                    <div><span>Adjustment</span><strong>@ShopHelper.Money(Model.ShippingFee)</strong></div>
+                    <div class="grand-total"><span>Total</span><strong>@ShopHelper.Money(Model.TotalAmount)</strong></div>
+                </div>
+            </div>
+        </div>
+
+        @* ===== Right: what the farmer can do with this order ===== *@
+        <aside class="decision-card">
+            <span class="decision-kicker">DECISION</span>
+
+            @if (status == "placed")
+            {
+                <h2>Do you accept this order?</h2>
+                <p>Accepting sets the ordered quantity aside from your stock for this customer.</p>
+                <form asp-action="Accept" method="post">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button class="btn-accept" type="submit"><span>✓</span> Accept order</button>
+                </form>
+
+                <div class="decision-divider"><span>or reject the order</span></div>
+                <form asp-action="Reject" method="post">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <label for="reject-reason">Reason for rejecting</label>
+                    <textarea id="reject-reason" name="reason" maxlength="500" placeholder="Tell the customer why..."></textarea>
+                    <div class="char-count"><span id="reason-count">0</span>/500</div>
+                    <button class="btn-reject" type="submit">Reject order</button>
+                </form>
+                <div class="decision-hint">The customer will be notified of your decision.</div>
+            }
+            else if (status == "accepted")
+            {
+                <h2>Has the customer picked up the order?</h2>
+                <p>Only confirm after you have handed over all the products.</p>
+                <form asp-action="Complete" method="post">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button class="btn-accept" type="submit"><span>✓</span> Confirm pickup</button>
+                </form>
+                <div class="decision-hint">An accepted order can no longer be cancelled. Confirming marks the reserved quantity as sold and tells the customer the order is complete.</div>
+
+                <div class="decision-divider"><span>customer did not come</span></div>
+                @if (DateTime.Now >= Model.PickupEnd)
+                {
+                    <form asp-action="NoShow" method="post" onsubmit="return confirm('Mark this order as no-show? The products will go back on sale.');">
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button class="btn-reject" type="submit">No-show · return to stock</button>
+                    </form>
+                }
+                else
+                {
+                    <div class="decision-hint">You can mark a no-show after the pickup time ends (@Model.PickupEnd.ToString("dd/MM/yyyy HH:mm")).</div>
+                }
+            }
+            else
+            {
+                <h2>This order has been handled</h2>
+                <p>Current status: <strong>@statusText</strong></p>
+            }
+
+        </aside>
+    </div>
 </section>
+
+@section Scripts {
+    <script>
+        // Live character count for the reject reason
+        const reason = document.getElementById('reject-reason');
+        if (reason) {
+            reason.addEventListener('input', () => document.getElementById('reason-count').textContent = reason.value.length);
+        }
+    </script>
+}

@@ -29,7 +29,7 @@ namespace MarketLink.Services
 
         Task<List<StockPrice>> GetStockHistoryAsync( int farmerId,int productId);
 
-        // Gọi sau khi đơn hàng cập nhật số lượng đã giữ/đã bán.
+        // Called after an order changes the reserved / sold quantities.
         Task HideIfUnavailableAsync(int productId);
     }
 }

@@ -21,11 +21,6 @@
     <span class="badge rounded-pill @approvalClass">@approvalText</span>
 </div>
 
-@if (TempData["Success"] is string success)
-{
-    <div class="alert alert-success">@success</div>
-}
-
 <section class="farmer-card p-3 p-md-4">
     <form asp-controller="Farmer" asp-action="Profile" method="post">
         @Html.AntiForgeryToken()

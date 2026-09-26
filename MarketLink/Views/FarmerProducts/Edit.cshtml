@@ -2,13 +2,25 @@
 @{
     ViewData["Title"] = "Edit product";
     Layout = "~/Views/Shared/_FarmerLayout.cshtml";
+
+    var product = (MarketLink.Models.Product)ViewBag.Product;
+    var history = ViewBag.StockHistory as List<MarketLink.Models.StockPrice> ?? new List<MarketLink.Models.StockPrice>();
+    var currentStock = history.FirstOrDefault(item => item.EffectiveTo == null);
+    bool isExpired = product.ExpiresAt <= DateTime.Now;
+    bool hasPrice = history.Count > 0;
+    bool isSoldOut = hasPrice && (currentStock == null || currentStock.QuantityAvailable <= 0);
+    // Sold out or expired: price & stock can only change through Re-up
+    bool needsReup = hasPrice && (isSoldOut || isExpired);
 }
 
 <div class="mb-4">
     <a asp-action="Index" class="small text-muted text-decoration-none">← Back to products</a>
     <h1 class="farmer-page-title mt-2">Edit product</h1>
-    <p class="farmer-page-subtitle mb-0">Update product details or image. Re-up is required to change the listing expiry.</p>
+    <p class="farmer-page-subtitle mb-0">Update the product details, price and stock. The listing period only changes when you re-up.</p>
 </div>
+
+@* ===== Current listing (price, stock left, sold) ===== *@
+<partial name="_CurrentListing" model="product" />
 
 <section class="farmer-card p-3 p-md-4">
     <form asp-action="Edit" method="post" enctype="multipart/form-data">
@@ -49,12 +61,75 @@
                 <span asp-validation-for="Image" class="text-danger small"></span>
             </div>
         </div>
+        @* ===== Price & stock (listing period stays the same) ===== *@
+        <div class="border-top pt-3 mt-3" id="stock">
+            <h2 class="farmer-card-title mb-1">Price &amp; stock</h2>
+            @if (needsReup)
+            {
+                <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 mb-0">
+                    <span>@(isExpired ? "The listing period is over, so this product is hidden from the shop." : "This product is sold out.") Re-up to set a new price, stock and listing period.</span>
+                    <a asp-action="Reup" asp-route-id="@product.ProductId" class="btn btn-sm btn-warning fw-semibold">Re-up now</a>
+                </div>
+            }
+            else
+            {
+                <p class="small text-muted mb-3">
+                    @if (hasPrice)
+                    {
+                        <text>Still for sale: <strong>@currentStock!.QuantityAvailable.ToString("0.##") @product.Unit</strong>. Change the price, add stock, or both.</text>
+                    }
+                    else
+                    {
+                        <text>This product has no price yet. Enter a price and a quantity to start selling.</text>
+                    }
+                </p>
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label asp-for="Price" class="form-label fw-semibold">Price (USD / @product.Unit)@(hasPrice ? "" : " *")</label>
+                        <input asp-for="Price" type="number" min="1.00" max="9999999999.99" step="0.01" class="form-control" />
+                        <span asp-validation-for="Price" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label asp-for="AddedQuantity" class="form-label fw-semibold">@(hasPrice ? "Add quantity" : "Quantity") (@product.Unit)@(hasPrice ? "" : " *")</label>
+                        <input asp-for="AddedQuantity" type="number" min="0" max="99999999.99" step="0.01" class="form-control" />
+                        <span asp-validation-for="AddedQuantity" class="text-danger small"></span>
+                    </div>
+                </div>
+            }
+        </div>
+
         <div class="d-flex flex-wrap gap-2 border-top pt-3 mt-3">
             <button type="submit" class="btn farmer-btn-primary px-4">Save changes</button>
             <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
         </div>
     </form>
 </section>
+
+
+@* ===== Everything else stored in the Products table (read only) ===== *@
+<section class="farmer-card p-3 p-md-4 mt-4">
+    <h2 class="farmer-card-title mb-3">Listing details</h2>
+    <div class="row g-3 small">
+        <div class="col-6 col-md-3"><div class="text-muted">Product ID</div><div class="fw-semibold">#@product.ProductId</div></div>
+        <div class="col-6 col-md-3">
+            <div class="text-muted">Status</div>
+            <div class="fw-semibold">
+                @if (isExpired) { <span class="badge text-bg-danger">Expired · hidden</span> }
+                else if (product.Status == "active") { <span class="badge text-bg-success">Visible</span> }
+                else { <span class="badge text-bg-secondary">Hidden</span> }
+            </div>
+        </div>
+        <div class="col-6 col-md-3"><div class="text-muted">Listing period</div><div class="fw-semibold">@(product.Exp == null ? "—" : product.Exp.ExpCode + " · " + product.Exp.DurationDays + (product.Exp.DurationDays == 1 ? " day" : " days"))</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Category</div><div class="fw-semibold">@(product.Category?.CategoryName ?? "—")</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Published</div><div class="fw-semibold">@product.PublishedAt.ToString("dd/MM/yyyy HH:mm")</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Expires</div><div class="fw-semibold @(isExpired ? "text-danger" : "")">@product.ExpiresAt.ToString("dd/MM/yyyy HH:mm")</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Created</div><div class="fw-semibold">@product.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Last updated</div><div class="fw-semibold">@(product.UpdatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "—")</div></div>
+    </div>
+</section>
+
+@* ===== Price & stock history (Stock_Price table, read only) ===== *@
+<div class="mt-4"><partial name="_PriceStock" model="product" /></div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

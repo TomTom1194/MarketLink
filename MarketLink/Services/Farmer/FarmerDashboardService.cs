@@ -40,4 +40,38 @@ public class FarmerDashboardService : IFarmerDashboardService
                 .ToListAsync()
         };
     }
+
+    // Products that need a re-up: listing period is over, or the current price row has nothing left to sell.
+    // Expired products are already hidden from the shop (the shop only lists products with expires_at in the future).
+    public async Task<List<FarmerProductAlertDto>> GetProductAlertsAsync(int farmerId)
+    {
+        var now = DateTime.Now;
+        var products = await _ctx.Products.AsNoTracking()
+            .Where(p => p.FarmerId == farmerId && p.Status != "removed")
+            .Select(p => new
+            {
+                p.ProductId,
+                p.ProductName,
+                p.ExpiresAt,
+                Current = p.StockPrices
+                    .Where(sp => sp.EffectiveTo == null)
+                    .Select(sp => new { Left = sp.QuantityIn - sp.QuantityReserved - sp.QuantitySold, sp.EffectiveFrom })
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var alerts = new List<FarmerProductAlertDto>();
+        foreach (var p in products)
+        {
+            if (p.ExpiresAt <= now)
+            {
+                alerts.Add(new FarmerProductAlertDto { ProductId = p.ProductId, ProductName = p.ProductName, Kind = "expired", Since = p.ExpiresAt });
+            }
+            else if (p.Current != null && p.Current.Left <= 0)
+            {
+                alerts.Add(new FarmerProductAlertDto { ProductId = p.ProductId, ProductName = p.ProductName, Kind = "sold_out", Since = p.Current.EffectiveFrom });
+            }
+        }
+        return alerts.OrderByDescending(a => a.Since).ToList();
+    }
 }

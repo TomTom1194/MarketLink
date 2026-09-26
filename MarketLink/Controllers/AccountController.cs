@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MarketLink.Dtos;
 using MarketLink.Models;
 using MarketLink.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
@@ -122,6 +123,36 @@ namespace MarketLink.Controllers
         {
             await _authService.SignOutAsync(HttpContext);
             return RedirectToAction("Index", "Home");
+        }
+
+        // GET: /Account/ChangePassword  (customer and farmer)
+        [HttpGet]
+        [Authorize(Roles = "customer,farmer")]
+        public IActionResult ChangePassword()
+        {
+            return View(new ChangePasswordDto());
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "customer,farmer")]
+        public async Task<IActionResult> ChangePassword(ChangePasswordDto model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            string error = await _authService.ChangePasswordAsync(userId, model.CurrentPassword, model.NewPassword);
+            if (error != "")
+            {
+                ModelState.AddModelError(error.StartsWith("Your current") ? nameof(model.CurrentPassword) : nameof(model.NewPassword), error);
+                return View(model);
+            }
+
+            TempData["Success"] = "Your password has been changed.";
+            return RedirectToAction(nameof(ChangePassword));
         }
 
         [HttpGet]
