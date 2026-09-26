@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - MarketLink</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/farmer-orders.css" asp-append-version="true" />
+</head>
+<body>
+<div class="farmer-shell">
+    @if (User.IsInRole("farmer"))
+    {
+        <aside class="farmer-sidebar">
+            <a class="brand-lockup" asp-area="" asp-controller="Home" asp-action="Index"><span class="brand-mark">M</span><span>Market<span>Link</span><small>NÔNG SẢN TƯƠI MỖI NGÀY</small></span></a>
+            <div class="sidebar-label">KHÔNG GIAN CỦA BẠN</div>
+            <nav class="farmer-nav">
+                <a asp-area="" asp-controller="Home" asp-action="Index"><span>⌂</span>Trang chủ</a>
+                <a class="@(ViewData["FarmerSection"]?.ToString() == "orders" ? "selected" : "")" asp-area="" asp-controller="Orders" asp-action="Index"><span>▤</span>Đơn hàng</a>
+                <a class="@(ViewData["FarmerSection"]?.ToString() == "statistics" ? "selected" : "")" asp-area="" asp-controller="Orders" asp-action="Statistics"><span>▥</span>Thống kê</a>
+                <a class="@(ViewData["FarmerSection"]?.ToString() == "notifications" ? "selected" : "")" asp-area="" asp-controller="Notifications" asp-action="Index"><span>♧</span>Thông báo</a>
+            </nav>
+            <div class="sidebar-bottom"><span class="online-dot"></span>Đang hoạt động
+                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post"><button type="submit">↪ Đăng xuất</button></form>
+            </div>
+        </aside>
+    }
+    <div class="farmer-workspace" style="@(User.IsInRole("farmer") ? "" : "margin-left:0")">
+        <header class="farmer-topbar">
+            <div class="breadcrumb"><a asp-area="" asp-controller="Home" asp-action="Index">MarketLink</a><span>/</span>@ViewData["Title"]</div>
+            <div class="topbar-user">
+                <a asp-area="" asp-controller="Notifications" asp-action="Index" class="topbar-bell" aria-label="Thông báo">♧</a>
+                @if (User.IsInRole("customer"))
+                {
+                    <a asp-area="" asp-controller="MyOrders" asp-action="Index">Đơn của tôi</a>
+                }
+                <span class="avatar top-avatar">@((User.Identity?.Name?.FirstOrDefault() ?? 'N').ToString().ToUpper())</span>
+                <span class="top-user-copy"><strong>@(User.Identity?.Name ?? "Người dùng")</strong><small>@(User.IsInRole("farmer") ? "Nông dân" : "Khách hàng")</small></span>
+            </div>
+        </header>
+        <div class="farmer-content">
+            <main role="main">
+                @if (TempData["Success"] != null)
+                {
+                    <div class="alert alert-success" role="alert">@TempData["Success"]</div>
+                }
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger" role="alert">@TempData["Error"]</div>
+                }
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+</div>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -38,6 +38,12 @@
         {
             <a class="btn-ml" style="align-self:flex-start" asp-controller="Shop" asp-action="Index">Choose your market ›</a>
         }
+
+        @* Only visitors can apply; logged-in users already have an account *@
+        @if (User.Identity == null || !User.Identity.IsAuthenticated)
+        {
+            <a class="hero-link" asp-controller="FarmerApplication" asp-action="Index">Are you a farmer? Apply to sell on MarketLink ›</a>
+        }
     </div>
     <div class="hero-side">
         <a class="hero-card yellow" asp-controller="Shop" asp-action="Products" asp-route-keyword="egg">

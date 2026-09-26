@@ -1,0 +1,24 @@
+@model IReadOnlyList<NotificationDto>
+@{ ViewData["Title"] = "Thông báo"; var unreadCount = (int)(ViewBag.UnreadCount ?? 0); }
+<section class="farmer-page notifications-page">
+    <div class="page-heading"><div><span class="eyebrow">CẬP NHẬT MỚI NHẤT</span><h1>Thông báo</h1><p>Bạn có @unreadCount thông báo chưa đọc.</p></div>@if (unreadCount > 0) { <form asp-action="MarkAllRead" method="post"><button class="mark-read" type="submit">✓ Đánh dấu đã đọc</button></form> }</div>
+    <div class="order-tabs notification-tabs"><button class="order-tab active" data-notification-filter="all">Tất cả <span>@Model.Count</span></button><button class="order-tab" data-notification-filter="orders">Đơn hàng</button></div>
+    <div class="notification-list">
+        @if (Model.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">♧</span><h2>Chưa có thông báo</h2><p>Thông báo về đơn hàng sẽ xuất hiện tại đây.</p></div>
+        }
+        @foreach (var notification in Model)
+        {
+            var iconClass = notification.Type switch { "new_order" => "green", "order_accepted" => "blue", "order_rejected" or "order_cancelled" => "orange", "order_completed" => "purple", _ => "gray" };
+            var icon = notification.Type switch { "new_order" => "▣", "order_accepted" or "order_completed" => "✓", "order_rejected" or "order_cancelled" => "×", _ => "♧" };
+            <article class="notification-card @(notification.IsRead ? "" : "unread")" data-kind="orders">
+                <span class="notification-icon @iconClass">@icon</span>
+                <div class="notification-copy"><div class="notification-title">@notification.Title @if (!notification.IsRead) { <span class="unread-dot"></span> }</div><p>@notification.Message</p></div>
+                <time datetime="@notification.CreatedAt.ToString("O")">@notification.CreatedAt.ToString("dd/MM/yyyy · HH:mm")</time>
+                @if (notification.OrderId.HasValue) { <a asp-controller="@(User.IsInRole("customer") ? "MyOrders" : "Orders")" asp-action="@(User.IsInRole("customer") ? "Detail" : "Details")" asp-route-id="@notification.OrderId" aria-label="Xem đơn hàng">›</a> }
+            </article>
+        }
+    </div>
+</section>
+@section Scripts { <script>document.querySelectorAll('[data-notification-filter]').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('[data-notification-filter]').forEach(x => x.classList.remove('active')); tab.classList.add('active'); document.querySelectorAll('.notification-card').forEach(card => card.hidden = tab.dataset.notificationFilter !== 'all' && card.dataset.kind !== tab.dataset.notificationFilter); }));</script> }

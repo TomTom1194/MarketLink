@@ -1,0 +1,33 @@
+@model OrderDetailDto
+@{ ViewData["Title"] = "Xử lý đơn hàng"; ViewData["FarmerSection"] = "orders"; var status = Model.Status.ToLowerInvariant(); var statusText = status switch { "placed" => "Chờ xác nhận", "accepted" => "Đã xác nhận · Chờ khách nhận", "completed" => "Hoàn thành", "rejected" => "Đã từ chối", "cancelled" => "Đã hủy", "no_show" => "Không đến nhận", _ => Model.Status }; var statusClass = status switch { "placed" => "pending", "accepted" => "accepted", "completed" => "completed", "rejected" or "cancelled" => "cancelled", _ => "shipping" }; }
+<section class="farmer-page">
+    <a class="back-link" asp-action="Index">← <span>Quay lại danh sách</span></a>
+    <div class="page-heading detail-heading"><div><span class="eyebrow">DUYỆT ĐƠN HÀNG</span><h1>Xử lý đơn hàng <span class="muted-code">#@Model.OrderCode</span></h1></div><span class="status-pill @statusClass"><i></i>@statusText</span></div>
+    <div class="process-layout"><div class="process-summary"><div class="info-grid compact"><div class="info-card"><span class="info-icon green">♙</span><div><small>Khách hàng</small><strong>@Model.CustomerName</strong><span class="sub-info">SĐT: @Model.CustomerPhone</span></div></div><div class="info-card"><span class="info-icon blue">▦</span><div><small>Ngày nhận hàng</small><strong>@Model.ReceiveDate.ToString("dd/MM/yyyy · HH:mm")</strong><span class="sub-info">@Model.Address</span></div></div></div><div class="content-card"><div class="card-heading"><div><h2>Danh sách sản phẩm</h2><p>Kiểm tra số lượng và giá trị đơn hàng</p></div></div><div class="table-responsive"><table class="order-table"><thead><tr><th>STT</th><th>Sản phẩm</th><th>Số lượng</th><th>Đơn giá</th><th class="text-end">Thành tiền</th></tr></thead><tbody>@for (var i = 0; i < Model.Items.Count; i++) { var item = Model.Items[i]; <tr><td class="row-number">@((i + 1).ToString("00"))</td><td><div class="product-cell"><span class="food-thumb @(i % 2 == 0 ? "tomato" : "greens")">@(i % 2 == 0 ? "🍅" : "🥬")</span><strong>@item.ProductName</strong></div></td><td>@item.Quantity.ToString("0.##")</td><td>@item.UnitPrice.ToString("N0")đ</td><td class="text-end fw-semibold">@item.TotalPrice.ToString("N0")đ</td></tr> }</tbody></table></div><div class="totals"><div><span>Tổng cộng</span><strong>@Model.TotalProductAmount.ToString("N0")đ</strong></div><div><span>Phí giao hàng</span><strong>@Model.ShippingFee.ToString("N0")đ</strong></div><div class="grand-total"><span>Thành tiền</span><strong>@Model.TotalAmount.ToString("N0")đ</strong></div></div></div></div>
+        <aside class="decision-card"><span class="decision-kicker">QUYẾT ĐỊNH</span>
+            @if (status == "placed")
+            {
+                <h2>Bạn có đồng ý nhận đơn này?</h2><p>Xác nhận để chuẩn bị sản phẩm cho khách hàng.</p><form asp-action="Accept" method="post"><input type="hidden" name="id" value="@Model.Id"/><button class="btn-accept" type="submit"><span>✓</span> Chấp nhận đơn</button></form><div class="decision-divider"><span>hoặc từ chối đơn</span></div><form asp-action="Reject" method="post"><input type="hidden" name="id" value="@Model.Id"/><label for="reject-reason">Lý do từ chối</label><textarea id="reject-reason" name="reason" maxlength="500" placeholder="Chia sẻ lý do để khách hàng được biết..."></textarea><div class="char-count"><span id="reason-count">0</span>/500</div><button class="btn-reject" type="submit">Từ chối đơn hàng</button></form><div class="decision-hint">Khách hàng sẽ nhận được thông báo về quyết định của bạn.</div>
+            }
+            else if (status == "accepted")
+            {
+                <h2>Khách đã đến nhận hàng?</h2><p>Chỉ xác nhận hoàn tất sau khi đã giao đủ sản phẩm cho khách.</p><form asp-action="Complete" method="post"><input type="hidden" name="id" value="@Model.Id"/><button class="btn-accept" type="submit"><span>✓</span> Xác nhận đã giao hàng</button></form><div class="decision-hint">Xác nhận sẽ cập nhật tồn kho và gửi thông báo hoàn tất cho khách hàng.</div>
+            }
+            else
+            {
+                <h2>Đơn hàng đã được xử lý</h2><p>Trạng thái hiện tại: <strong>@statusText</strong></p><a class="btn-soft" asp-action="Details" asp-route-id="@Model.Id">Xem chi tiết đơn hàng</a>
+            }
+            @if (status == "placed" || status == "accepted")
+            {
+                <div class="decision-divider"><span>hủy đơn hàng</span></div>
+                <form asp-action="Cancel" method="post">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <label for="cancel-reason">Lý do hủy đơn</label>
+                    <textarea id="cancel-reason" name="reason" maxlength="500" required placeholder="Nhập lý do để thông báo cho khách hàng..."></textarea>
+                    <button class="btn-reject" type="submit">Hủy đơn hàng</button>
+                </form>
+            }
+        </aside>
+    </div>
+</section>
+@section Scripts { <script>const reason = document.getElementById('reject-reason'); if (reason) reason.addEventListener('input', () => document.getElementById('reason-count').textContent = reason.value.length);</script> }
