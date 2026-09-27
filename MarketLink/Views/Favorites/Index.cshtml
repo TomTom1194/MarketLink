@@ -4,6 +4,7 @@
     ViewData["AccountMenu"] = "favorites";
     Layout = "_AccountLayout";
     Dictionary<int, int> productCounts = ViewBag.ProductCounts;
+    Dictionary<int, MarketLink.Dtos.RatingSummaryDto> farmerRatings = ViewBag.FarmerRatings;
 }
 
 <h1 class="title">Favorite farmers</h1>
@@ -41,7 +42,14 @@ else
                 <span class="farmer-avatar" style="width:64px;height:64px;font-size:26px;border:3px solid #E6F4EA">@farmer.BrandName.Substring(0, 1).ToUpper()</span>
                 <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:160px">
                     <span style="font-size:16px;font-weight:700">@farmer.BrandName</span>
-                    <span class="muted">@(marketNames.Count > 0 ? string.Join(" · ", marketNames) : "No active stall")</span>
+                    <span class="muted">
+                        @if (farmerRatings.ContainsKey(farmer.FarmerId))
+                        {
+                            <span class="card-rating"><span class="star">★</span><strong>@farmerRatings[farmer.FarmerId].Average.ToString("0.0")</strong><span class="count">(@farmerRatings[farmer.FarmerId].Count)</span></span>
+                            <span> · </span>
+                        }
+                        @(marketNames.Count > 0 ? string.Join(" · ", marketNames) : "No active stall")
+                    </span>
                     @if (farmer.ApprovalStatus != "approved")
                     {
                         <span class="stock-low">This farmer is not selling right now</span>

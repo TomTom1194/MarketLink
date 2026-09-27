@@ -20,8 +20,10 @@ namespace MarketLink.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login(string? returnUrl = null)
+        public IActionResult Login(string? returnUrl = null, bool locked = false)
         {
+            ViewBag.Locked = locked;
+
             // Already logged in? Send them to the portal of their role
             if (User.Identity != null && User.Identity.IsAuthenticated)
             {

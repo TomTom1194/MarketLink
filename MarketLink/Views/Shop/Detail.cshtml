@@ -1,5 +1,6 @@
 @model StockPrice
 @using MarketLink.Helpers
+@using MarketLink.Dtos
 @{
     var product = Model.Product!;
     var stall = Model.Stall!;
@@ -7,6 +8,9 @@
     var farmer = stall.Farmer!;
     List<StockPrice> otherProducts = ViewBag.OtherProducts;
     List<DateTime> pickupDates = ViewBag.PickupDates;
+    RatingSummaryDto farmerRating = ViewBag.FarmerRating;
+    List<ReviewDto> farmerReviews = ViewBag.FarmerReviews;
+    PagerDto reviewPager = ViewBag.ReviewPager;
 
     ViewData["Title"] = product.ProductName;
     Layout = "_ShopLayout";
@@ -34,6 +38,19 @@
         <div style="display:flex;flex-direction:column;gap:8px">
             <h1>@product.ProductName</h1>
             <span class="muted">Category: <strong style="color:#1F2421">@product.Category!.CategoryName</strong> · Unit: <strong style="color:#1F2421">@product.Unit</strong></span>
+            <span class="rating-line">
+                @if (farmerRating.Count > 0)
+                {
+                    <span class="stars" aria-hidden="true">@ShopHelper.Stars(farmerRating.Average)</span>
+                    <strong>@farmerRating.Average.ToString("0.0")</strong>
+                    <a href="#reviews">@farmerRating.Count review@(farmerRating.Count > 1 ? "s" : "") of @farmer.BrandName</a>
+                }
+                else
+                {
+                    <span class="stars" style="color:#C9D0CC" aria-hidden="true">★★★★★</span>
+                    <a href="#reviews">No reviews yet</a>
+                }
+            </span>
         </div>
 
         <div class="price-box">
@@ -112,7 +129,14 @@
             <span class="farmer-avatar">@farmer.BrandName.Substring(0, 1).ToUpper()</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:2px">
                 <span style="font-size:16px;font-weight:700">@farmer.BrandName</span>
-                <span class="muted">Contact: @farmer.ContactPerson · Stall @stall.StallCode</span>
+                <span class="muted">
+                    @if (farmerRating.Count > 0)
+                    {
+                        <a href="#reviews" class="plain-link"><span style="color:#E0A800">★</span> <strong style="color:#1F2421">@farmerRating.Average.ToString("0.0")</strong> (@farmerRating.Count)</a>
+                        <span> · </span>
+                    }
+                    Contact: @farmer.ContactPerson · Stall @stall.StallCode
+                </span>
             </div>
             <partial name="_FavoriteFarmerButton" model="farmer.FarmerId" view-data='new ViewDataDictionary(ViewData) { { "IsSaved", (bool)ViewBag.IsFavorite } }' />
         </div>
@@ -173,6 +197,28 @@
             {
                 @Html.Raw("</ul>")
             }
+        </div>
+    }
+</div>
+
+<div class="card-box" id="reviews">
+    <h2 class="title" style="margin-bottom:4px">Reviews of @farmer.BrandName</h2>
+    <p class="muted" style="margin:0 0 14px">From customers who picked up their order at this farmer's stall.</p>
+    @if (farmerRating.Count == 0)
+    {
+        <p class="desc">This farmer has no reviews yet.</p>
+    }
+    else
+    {
+        <div class="review-layout">
+            <partial name="_RatingSummary" model="farmerRating" />
+            <div class="review-list">
+                @foreach (var r in farmerReviews)
+                {
+                    <partial name="_ReviewItem" model="r" />
+                }
+                <partial name="_Pager" model="reviewPager" />
+            </div>
         </div>
     }
 </div>

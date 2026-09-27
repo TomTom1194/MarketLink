@@ -8,6 +8,8 @@ namespace MarketLink.Services
 
         Task<bool> MarkAllReadAsync(int userId);
 
+        Task<int> CountUnreadAsync(int userId);
+
         Task CreateAsync(int userId, int? orderId, string type, string title, string message);
     }
 }

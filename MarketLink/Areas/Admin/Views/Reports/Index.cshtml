@@ -7,7 +7,7 @@
     decimal maxMarket = Model.RevenueByMarket.Count > 0 ? Model.RevenueByMarket.Max(r => r.Revenue) : 0;
     decimal maxFarmer = Model.TopFarmers.Count > 0 ? Model.TopFarmers.Max(r => r.Revenue) : 0;
 
-    string[] statusOrder = { "placed", "accepted", "completed", "cancelled", "rejected", "no_show" };
+    string[] statusOrder = { "placed", "accepted", "completed", "cancelled", "rejected", "no_show", "disputed" };
 }
 
 <div class="toolbar">

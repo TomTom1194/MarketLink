@@ -43,7 +43,7 @@ namespace MarketLink.Models
         [Column("pickup_phone")]
         public string PickupPhone { get; set; } = "";
 
-        // placed | accepted | rejected | cancelled | completed | no_show
+        // placed | accepted | rejected | cancelled | completed | no_show | disputed
         [Required]
         [StringLength(20)]
         [Column("status")]

@@ -8,6 +8,7 @@
     List<Market> markets = ViewBag.Markets;
     List<StockPrice> newestProducts = ViewBag.NewestProducts;
     List<FarmerProfile> farmers = ViewBag.Farmers;
+    Dictionary<int, MarketLink.Dtos.RatingSummaryDto> farmerRatings = ViewBag.FarmerRatings;
 }
 
 <div class="card-box">
@@ -149,6 +150,14 @@
                 <a class="farmer-card" asp-controller="Shop" asp-action="Products" asp-route-marketId="@(firstStall != null ? firstStall.MarketId : null)" asp-route-keyword="@f.BrandName">
                     <span class="farmer-avatar" style="width:88px;height:88px;font-size:32px;border:3px solid #E6F4EA">@f.BrandName.Substring(0, 1).ToUpper()</span>
                     <span style="font-size:15px;font-weight:700;line-height:1.3">@f.BrandName</span>
+                    @if (farmerRatings.ContainsKey(f.FarmerId))
+                    {
+                        <span class="card-rating"><span class="star">★</span><strong>@farmerRatings[f.FarmerId].Average.ToString("0.0")</strong><span class="count">(@farmerRatings[f.FarmerId].Count)</span></span>
+                    }
+                    else
+                    {
+                        <span class="card-rating none">No reviews yet</span>
+                    }
                     @if (firstStall != null && firstStall.Market != null)
                     {
                         <span class="muted">@firstStall.Market.MarketName</span>

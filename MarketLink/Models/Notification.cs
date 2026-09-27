@@ -18,7 +18,7 @@ namespace MarketLink.Models
         [Column("order_id")]
         public int? OrderId { get; set; }
 
-        // new_order | order_accepted | order_rejected | order_cancelled | order_completed
+        // new_order | order_accepted | order_rejected | order_cancelled | order_completed | order_disputed | dispute_resolved | account_warning
         [Required]
         [StringLength(30)]
         [Column("type")]

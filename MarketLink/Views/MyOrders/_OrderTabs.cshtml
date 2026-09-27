@@ -8,6 +8,7 @@
     <a class="@(status == "placed" ? "on" : "")" asp-action="Index" asp-route-status="placed">Waiting for farmer</a>
     <a class="@(status == "accepted" ? "on" : "")" asp-action="Index" asp-route-status="accepted">Ready for pickup</a>
     <a class="@(status == "completed" ? "on" : "")" asp-action="Index" asp-route-status="completed">Picked up</a>
+    <a class="@(status == "disputed" ? "on" : "")" asp-action="Index" asp-route-status="disputed">Under review</a>
     <a class="@(status == "cancelled" ? "on" : "")" asp-action="Index" asp-route-status="cancelled">Cancelled</a>
     <a class="@(status == "rejected" ? "on" : "")" asp-action="Index" asp-route-status="rejected">Rejected</a>
 </nav>

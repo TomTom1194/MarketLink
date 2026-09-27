@@ -1,0 +1,82 @@
+@model List<OrderDispute>
+@{
+    ViewData["Title"] = "Pickup reports";
+    Layout = "_AdminLayout";
+
+    string status = ViewBag.Status;
+}
+
+<div class="toolbar">
+    <ul class="nav nav-pills">
+        <li class="nav-item">
+            <a class="nav-link @(status == "open" ? "active" : "")" asp-action="Index" asp-route-status="open">Waiting for decision</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(status == "resolved" ? "active" : "")" asp-action="Index" asp-route-status="resolved">Closed</a>
+        </li>
+    </ul>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="admin-card text-muted">No reports in this list.</div>
+}
+else
+{
+    <div class="admin-table">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Order</th>
+                <th>Reported by</th>
+                <th>Customer</th>
+                <th>Farmer</th>
+                <th>Reported at</th>
+                <th>Answers</th>
+                <th>@(status == "open" ? "Status" : "At fault")</th>
+                <th class="text-end">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var d in Model)
+            {
+                var order = d.Order!;
+                bool bothAnswered = d.CustomerReason != null && d.FarmerReason != null;
+                bool timeUp = DateTime.Now >= d.CreatedAt.AddHours(MarketLink.Services.DisputeService.ReplyHours);
+                <tr>
+                    <td class="fw-semibold">#@order.OrderCode</td>
+                    <td>@(d.ReportedBy == "customer" ? "Customer" : "Farmer")</td>
+                    <td>@(order.Customer != null ? order.Customer.FullName : "")</td>
+                    <td>@(order.Stall != null && order.Stall.Farmer != null ? order.Stall.Farmer.BrandName : "")</td>
+                    <td class="text-nowrap">@d.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>@(bothAnswered ? "Both sides" : "One side")</td>
+                    <td>
+                        @if (status == "open")
+                        {
+                            if (bothAnswered || timeUp)
+                            {
+                                <span class="status-pill status-pending">Ready to decide</span>
+                            }
+                            else
+                            {
+                                <span class="status-pill status-hidden">Waiting for reply</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="status-pill @(d.AtFault == "none" ? "status-active" : "status-rejected")">
+                                @(d.AtFault == "customer" ? "Customer" : d.AtFault == "farmer" ? "Farmer" : "No one")
+                            </span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Detail" asp-route-id="@d.DisputeId">Open</a>
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

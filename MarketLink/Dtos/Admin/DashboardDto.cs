@@ -11,6 +11,8 @@ namespace MarketLink.Dtos.Admin
         public int TotalOrders { get; set; }
         public int OrdersToday { get; set; }
         public decimal RevenueThisMonth { get; set; }
+        public int OpenReports { get; set; }
+        public int ReadyReports { get; set; }
 
         // Newest farmers waiting for approval
         public List<FarmerRowDto> LatestPendingFarmers { get; set; } = new List<FarmerRowDto>();

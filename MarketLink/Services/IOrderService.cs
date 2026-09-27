@@ -14,7 +14,6 @@ namespace MarketLink.Services
 
         Task<bool> CompleteOrderAsync(int id, int farmerId);
 
-        Task<bool> MarkNoShowAsync(int id, int farmerId);
 
     }
 }

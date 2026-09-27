@@ -7,6 +7,7 @@
     int? categoryId = ViewBag.CategoryId;
     int? farmerId = ViewBag.FarmerId;
     string farmerName = ViewBag.FarmerName;
+    MarketLink.Dtos.RatingSummaryDto? farmerRating = ViewBag.FarmerRating;
     PagerDto pager = ViewBag.Pager;
     string? sort = ViewBag.Sort;
 
@@ -52,6 +53,10 @@
             <a class="chip on" asp-action="Products" asp-route-marketId="@market.MarketId" asp-route-categoryId="@categoryId" asp-route-keyword="@keyword" asp-route-sort="@sort" title="Show all farmers">
                 @IconHelper.Icon("store", 16) @farmerName @IconHelper.Icon("x", 14)
             </a>
+            @if (farmerRating != null && farmerRating.Count > 0)
+            {
+                <span class="card-rating"><span class="star">★</span><strong>@farmerRating.Average.ToString("0.0")</strong><span class="count">(@farmerRating.Count review@(farmerRating.Count > 1 ? "s" : ""))</span></span>
+            }
         </div>
     }
 

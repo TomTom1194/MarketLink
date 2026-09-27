@@ -43,6 +43,25 @@
         <div class="stat-value">@Model.RevenueThisMonth.ToString("N0")</div>
         <div class="stat-note">VND, completed orders</div>
     </div>
+
+    <div class="admin-card stat-card">
+        <div class="stat-label">Pickup reports</div>
+        <div class="stat-value">@Model.OpenReports</div>
+        <div class="stat-note">
+            @if (Model.ReadyReports > 0)
+            {
+                <a asp-controller="Disputes" asp-action="Index" asp-route-status="open">@Model.ReadyReports ready to decide</a>
+            }
+            else if (Model.OpenReports > 0)
+            {
+                <a asp-controller="Disputes" asp-action="Index" asp-route-status="open">Waiting for replies</a>
+            }
+            else
+            {
+                <span>No reports waiting</span>
+            }
+        </div>
+    </div>
 </div>
 
 <div class="toolbar">

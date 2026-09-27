@@ -10,6 +10,10 @@
     </div>
 
     <form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post" novalidate class="auth-form">
+        @if (ViewBag.Locked == true)
+        {
+            <div class="alert-ml err" role="alert">Your account has been locked, so you were logged out. Please check your email for details.</div>
+        }
         <div asp-validation-summary="ModelOnly" class="alert-ml err" role="alert"></div>
 
         <div class="field">

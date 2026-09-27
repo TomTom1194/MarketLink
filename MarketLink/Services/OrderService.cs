@@ -127,30 +127,6 @@ namespace MarketLink.Services
             return true;
         }
 
-        // The customer did not come: close the order and put the reserved quantity back on sale.
-        public async Task<bool> MarkNoShowAsync(int id, int farmerId)
-        {
-            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-            var order = await GetTrackedOrderAsync(id, farmerId);
-            if (order == null || !IsStatus(order, "accepted")) return false;
-
-            // Only after the pickup time is over
-            if (DateTime.Now < order.PickupDate.Date.Add(order.PickupTo))
-            {
-                throw new InvalidOperationException("You can mark a no-show only after the pickup time is over.");
-            }
-
-            await ReleaseStockAsync(order);
-            order.Status = "no_show";
-
-            // The Notifications table only allows a few types, so "order_cancelled" is used for this message
-            AddCustomerNotification(order, "order_cancelled", $"Order #{order.OrderCode} was not picked up",
-                "You did not come to pick up this order, so the farmer closed it and the products went back on sale.");
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return true;
-        }
-
         private Task<Order?> GetTrackedOrderAsync(int id, int farmerId) => _context.Orders
             .Where(o => o.OrderId == id && o.Stall != null && o.Stall.FarmerId == farmerId)
             .Include(o => o.Items)
@@ -184,18 +160,6 @@ namespace MarketLink.Services
 
                 // Remember which row holds the reservation (the price the customer pays does not change)
                 item.StockPriceId = stock.StockPriceId;
-            }
-        }
-
-        // No-show: give the reserved quantity back so other customers can buy it.
-        private async Task ReleaseStockAsync(Order order)
-        {
-            foreach (var item in order.Items)
-            {
-                var stock = await _context.StockPrices.FirstOrDefaultAsync(sp => sp.StockPriceId == item.StockPriceId);
-                if (stock == null) continue;
-
-                stock.QuantityReserved = Math.Max(0, stock.QuantityReserved - item.Quantity);
             }
         }
 

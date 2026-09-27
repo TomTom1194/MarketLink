@@ -13,15 +13,18 @@ namespace MarketLink.Controllers
         private readonly IShopService _shopService;
         private readonly ICheckoutService _checkoutService;
         private readonly IFavoriteService _favoriteService;
+        private readonly IReviewService _reviewService;
         private const int ProductPageSize = 20;
         private const int MarketPageSize = 8;
         private const int SearchMarketPageSize = 5;
+        private const int ReviewPageSize = 5;
 
-        public ShopController(IShopService shopService, ICheckoutService checkoutService, IFavoriteService favoriteService)
+        public ShopController(IShopService shopService, ICheckoutService checkoutService, IFavoriteService favoriteService, IReviewService reviewService)
         {
             _shopService = shopService;
             _checkoutService = checkoutService;
             _favoriteService = favoriteService;
+            _reviewService = reviewService;
         }
 
         [HttpGet]
@@ -102,7 +105,18 @@ namespace MarketLink.Controllers
             ViewBag.HasLocation = hasLocation;
             ViewBag.SelectedMarketId = GetSelectedMarketId();
 
-            return View(results.Skip(pager.Skip()).Take(pager.PageSize).ToList());
+            var pageResults = results.Skip(pager.Skip()).Take(pager.PageSize).ToList();
+            var farmerIds = new List<int>();
+            foreach (var r in pageResults)
+            {
+                foreach (var sp in r.Products)
+                {
+                    farmerIds.Add(sp.Product!.FarmerId);
+                }
+            }
+            ViewBag.FarmerRatings = await _reviewService.GetFarmerRatingsAsync(farmerIds);
+
+            return View(pageResults);
         }
 
         [HttpGet]
@@ -192,11 +206,23 @@ namespace MarketLink.Controllers
             ViewBag.FarmerName = farmer != null ? farmer.BrandName : "";
             ViewBag.Sort = sort;
 
+            var farmerIds = new List<int>();
+            foreach (var sp in products)
+            {
+                farmerIds.Add(sp.Product!.FarmerId);
+            }
+            ViewBag.FarmerRatings = await _reviewService.GetFarmerRatingsAsync(farmerIds);
+
+            if (farmerId != null)
+            {
+                ViewBag.FarmerRating = await _reviewService.GetFarmerRatingAsync(farmerId.Value);
+            }
+
             return View(products);
         }
 
         [HttpGet]
-        public async Task<IActionResult> Detail(int id)
+        public async Task<IActionResult> Detail(int id, int reviewPage = 1)
         {
             var product = await _shopService.GetProductDetailAsync(id);
             if (product == null)
@@ -204,7 +230,8 @@ namespace MarketLink.Controllers
                 return NotFound();
             }
 
-            ViewBag.OtherProducts = await _shopService.GetOtherProductsOfStallAsync(product.StallId, product.StockPriceId);
+            List<StockPrice> otherProducts = await _shopService.GetOtherProductsOfStallAsync(product.StallId, product.StockPriceId);
+            ViewBag.OtherProducts = otherProducts;
             ViewBag.PickupDates = _checkoutService.GetPickupDates(product.Stall!, product.Stall!.Market!);
 
             bool isFavorite = false;
@@ -214,6 +241,19 @@ namespace MarketLink.Controllers
                 isFavorite = await _favoriteService.IsFavoriteAsync(customerId, product.Stall.FarmerId);
             }
             ViewBag.IsFavorite = isFavorite;
+
+            RatingSummaryDto farmerRating = await _reviewService.GetFarmerRatingAsync(product.Stall.FarmerId);
+            ViewBag.FarmerRating = farmerRating;
+            var reviewPager = PagerDto.Create(reviewPage, farmerRating.Count, ReviewPageSize, "reviewPage", "reviews");
+            ViewBag.ReviewPager = reviewPager;
+            ViewBag.FarmerReviews = await _reviewService.GetFarmerReviewsAsync(product.Stall.FarmerId, reviewPager.Skip(), reviewPager.PageSize);
+
+            var farmerRatings = new Dictionary<int, RatingSummaryDto>();
+            if (farmerRating.Count > 0)
+            {
+                farmerRatings[product.Stall.FarmerId] = farmerRating;
+            }
+            ViewBag.FarmerRatings = farmerRatings;
 
             return View(product);
         }
