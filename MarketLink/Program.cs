@@ -1,5 +1,7 @@
 using MarketLink.Data;
 using System.Globalization;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using MarketLink.Services;
 using MarketLink.Services.Admin;
 using MarketLink.Services.Farmer;
@@ -29,6 +31,9 @@ builder.Services.AddScoped<ICustomerOrderService, CustomerOrderService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IFavoriteService, FavoriteService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<IDisputeService, DisputeService>();
+builder.Services.AddHostedService<AutoCancelService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IFarmerAccountService, FarmerAccountService>();
 builder.Services.AddScoped<IFarmerProfileService, FarmerProfileService>();
@@ -75,6 +80,27 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthentication();
+
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity != null && context.User.Identity.IsAuthenticated)
+    {
+        int userId;
+        if (int.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out userId))
+        {
+            var db = context.RequestServices.GetRequiredService<MarketLinkDbContext>();
+            bool isActive = await db.Users.AnyAsync(u => u.UserId == userId && u.Status == "active");
+            if (!isActive)
+            {
+                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                context.Response.Redirect("/Account/Login?locked=true");
+                return;
+            }
+        }
+    }
+    await next();
+});
+
 app.UseAuthorization();
 
 app.MapStaticAssets();

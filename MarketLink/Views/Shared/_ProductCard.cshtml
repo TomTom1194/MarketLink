@@ -5,6 +5,12 @@
     bool soldOut = available < 1;
     bool lowStock = !soldOut && available <= 5;
     var product = Model.Product!;
+    var farmerRatings = ViewData["FarmerRatings"] as Dictionary<int, MarketLink.Dtos.RatingSummaryDto>;
+    MarketLink.Dtos.RatingSummaryDto? rating = null;
+    if (farmerRatings != null && farmerRatings.ContainsKey(product.FarmerId))
+    {
+        rating = farmerRatings[product.FarmerId];
+    }
 }
 <div class="p-card">
     <a class="img" asp-controller="Shop" asp-action="Detail" asp-route-id="@Model.StockPriceId" aria-label="@product.ProductName">
@@ -27,6 +33,14 @@
         @if (Model.Stall != null)
         {
             <span class="stall">@IconHelper.Icon("pin") @(Model.Stall.Farmer != null ? Model.Stall.Farmer.BrandName : "") · Stall @Model.Stall.StallCode</span>
+        }
+        @if (rating != null)
+        {
+            <span class="card-rating stall-rating" title="Farmer rating: @rating.Average.ToString("0.0") out of 5 from @rating.Count review@(rating.Count > 1 ? "s" : "")"><span class="star">★</span><strong>@rating.Average.ToString("0.0")</strong><span class="count">(@rating.Count)</span></span>
+        }
+        else if (farmerRatings != null)
+        {
+            <span class="card-rating stall-rating none">No reviews yet</span>
         }
         @if (soldOut)
         {

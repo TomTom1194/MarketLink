@@ -85,6 +85,7 @@ else
                         <form asp-action="Reorder" asp-route-id="@o.OrderId" method="post" class="inline-form">
                             <button type="submit" class="btn-ml" style="height:40px;font-size:14px">@IconHelper.Icon("basket", 16) Reorder</button>
                         </form>
+                        <a class="btn-ml outline" style="height:40px;font-size:14px" asp-action="Detail" asp-route-id="@o.OrderId" asp-fragment="reviews">@IconHelper.Icon("star", 16) Review</a>
                     }
                     <a class="btn-ml outline" style="height:40px;font-size:14px" asp-action="Detail" asp-route-id="@o.OrderId">Details ›</a>
                 </div>

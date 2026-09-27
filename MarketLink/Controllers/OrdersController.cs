@@ -9,10 +9,12 @@ namespace MarketLink.Controllers
     public class OrdersController : Controller
     {
         private readonly IOrderService _orderService;
+        private readonly IDisputeService _disputeService;
 
-        public OrdersController(IOrderService orderService)
+        public OrdersController(IOrderService orderService, IDisputeService disputeService)
         {
             _orderService = orderService;
+            _disputeService = disputeService;
         }
 
         public async Task<IActionResult> Index(string? phone)
@@ -29,7 +31,14 @@ namespace MarketLink.Controllers
             var farmerId = CurrentUserId();
             if (farmerId == null) return Forbid();
             var order = await _orderService.GetOrderDetailAsync(id, farmerId.Value);
-            return order == null ? NotFound() : View(order);
+            if (order == null)
+            {
+                return NotFound();
+            }
+
+            ViewBag.Dispute = await _disputeService.GetByOrderAsync(order.Id);
+            ViewBag.CanReport = order.Status == "accepted" && DateTime.Now >= order.PickupEnd && DateTime.Now <= order.PickupEnd.AddHours(AutoCancelService.WaitHours);
+            return View(order);
         }
 
         [HttpPost]
@@ -55,7 +64,23 @@ namespace MarketLink.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public Task<IActionResult> NoShow(int id) => RunOrderAction(id, (orderId, farmerId) => _orderService.MarkNoShowAsync(orderId, farmerId), "The order was marked as no-show and the products are back in stock.");
+        public async Task<IActionResult> Report(int id, string? reason)
+        {
+            var farmerId = CurrentUserId();
+            if (farmerId == null) return Forbid();
+
+            string error = await _disputeService.SendFarmerReasonAsync(farmerId.Value, id, reason);
+            if (error != "")
+            {
+                TempData["Error"] = error;
+            }
+            else
+            {
+                TempData["Success"] = "Thanks, we received your side. MarketLink will review this order and let you know the result.";
+            }
+
+            return RedirectToAction(nameof(Details), new { id });
+        }
 
         private async Task<IActionResult> RunOrderAction(int id, Func<int, int, Task<bool>> action, string successMessage)
         {

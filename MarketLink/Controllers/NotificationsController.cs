@@ -22,7 +22,13 @@ namespace MarketLink.Controllers
         {
             if (!TryGetUserId(out var userId)) return Forbid();
             var notifications = await _notificationService.GetForUserAsync(userId);
-            ViewBag.UnreadCount = notifications.Count(notification => !notification.IsRead);
+            int unreadCount = notifications.Count(notification => !notification.IsRead);
+            ViewBag.UnreadCount = unreadCount;
+
+            if (unreadCount > 0)
+            {
+                await _notificationService.MarkAllReadAsync(userId);
+            }
 
             // Farmers: products that sold out or expired and need a re-up
             ViewBag.ProductAlerts = User.IsInRole("farmer")

@@ -9,6 +9,24 @@ namespace MarketLink.Helpers
             return "$" + amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
         }
 
+        public static string Stars(double rating)
+        {
+            int fullStars = (int)Math.Round(rating);
+            string result = "";
+            for (int i = 1; i <= 5; i++)
+            {
+                if (i <= fullStars)
+                {
+                    result = result + "★";
+                }
+                else
+                {
+                    result = result + "☆";
+                }
+            }
+            return result;
+        }
+
         public static string ItemStatus(StockPrice sp)
         {
             if (sp.EffectiveTo != null)
@@ -148,12 +166,14 @@ namespace MarketLink.Helpers
             if (status == "cancelled") return "Cancelled";
             if (status == "completed") return "Picked up";
             if (status == "no_show") return "Not picked up";
+            if (status == "disputed") return "Under review";
             return status;
         }
 
         public static string StatusClass(string status)
         {
             if (status == "placed") return "badge-yellow";
+            if (status == "disputed") return "badge-yellow";
             if (status == "accepted") return "badge-green";
             if (status == "completed") return "badge-dark";
             return "badge-red";

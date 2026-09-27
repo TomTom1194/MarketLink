@@ -9,8 +9,11 @@
     var market = stall.Market!;
     var farmer = stall.Farmer!;
     bool canCancel = Model.Status == "placed"; // once accepted the order cannot be cancelled
-    bool wasAccepted = Model.Status == "accepted" || Model.Status == "completed" || Model.Status == "no_show" || Model.AcceptedAt != null;
+    bool wasAccepted = Model.Status == "accepted" || Model.Status == "completed" || Model.Status == "no_show" || Model.Status == "disputed" || Model.AcceptedAt != null;
     string directionsLink = ShopHelper.MapLink(stall, market);
+    FarmerReview? farmerReview = ViewBag.FarmerReview;
+    OrderDispute? dispute = ViewBag.Dispute;
+    bool canReport = ViewBag.CanReport;
 }
 
 <a asp-action="Index" style="font-size:15px;font-weight:700;text-decoration:none">‹ My orders</a>
@@ -47,6 +50,27 @@
                     <li>
                         <span class="dot red">@IconHelper.Icon("x", 14)</span>
                         <span><strong>Rejected by farmer</strong><br /><span class="muted">@(Model.RejectedAt != null ? Model.RejectedAt.Value.ToString("dd/MM/yyyy HH:mm") + " · " : "")@Model.RejectReason</span></span>
+                    </li>
+                }
+                else if (Model.Status == "disputed")
+                {
+                    <li>
+                        <span class="dot red">!</span>
+                        <span><strong>@(dispute != null && dispute.ReportedBy == "customer" ? "You reported a problem" : "The farmer reported a problem")</strong><br /><span class="muted">@(dispute != null ? dispute.CreatedAt.ToString("dd/MM/yyyy HH:mm") + " · " : "")Under review by MarketLink</span></span>
+                    </li>
+                }
+                else if (Model.Status == "cancelled" && dispute != null)
+                {
+                    <li>
+                        <span class="dot red">@IconHelper.Icon("x", 14)</span>
+                        <span><strong>Closed by MarketLink after review</strong><br /><span class="muted">@(Model.CancelledAt != null ? Model.CancelledAt.Value.ToString("dd/MM/yyyy HH:mm") : "")</span></span>
+                    </li>
+                }
+                else if (Model.Status == "cancelled" && Model.CancelReason == MarketLink.Services.AutoCancelService.CancelReason)
+                {
+                    <li>
+                        <span class="dot red">@IconHelper.Icon("x", 14)</span>
+                        <span><strong>Closed automatically</strong><br /><span class="muted">@(Model.CancelledAt != null ? Model.CancelledAt.Value.ToString("dd/MM/yyyy HH:mm") + " · " : "")@Model.CancelReason</span></span>
                     </li>
                 }
                 else if (Model.Status == "cancelled")
@@ -106,6 +130,45 @@
                 <span style="font-size:22px;font-weight:800;color:#E53935">@ShopHelper.Money(Model.TotalAmount)</span>
             </div>
         </div>
+
+        @if (Model.Status == "completed")
+        {
+            <div class="card-box" id="reviews" style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:17px;font-weight:800">Rate @farmer.BrandName</span>
+                    <span class="muted">How was the produce and the service for this order? Your review is shown to other shoppers with the items you bought. You can only post it once.</span>
+                </div>
+
+                <div class="review-products">
+                    @foreach (var it in Model.Items)
+                    {
+                        <span class="review-product">
+                            <img src="@it.ImageUrl" alt="" />
+                            <span>@it.ProductName</span>
+                        </span>
+                    }
+                </div>
+
+                @if (farmerReview != null)
+                {
+                    <span class="stars" style="font-size:20px">@ShopHelper.Stars(farmerReview.Rating)</span>
+                    @if (!string.IsNullOrEmpty(farmerReview.Comment))
+                    {
+                        <p class="desc" style="margin:0">@farmerReview.Comment</p>
+                    }
+                    <span class="muted" style="font-size:14px">You reviewed on @farmerReview.CreatedAt.ToString("dd/MM/yyyy")</span>
+                }
+                else
+                {
+                    <form asp-controller="Reviews" asp-action="Farmer" method="post" class="review-form">
+                        <input type="hidden" name="orderId" value="@Model.OrderId" />
+                        <partial name="_StarInput" model='"farmer"' />
+                        <textarea name="comment" rows="3" maxlength="500" placeholder="Was the produce fresh? Was the order ready on time? (optional)" aria-label="Your review"></textarea>
+                        <button type="submit" class="btn-ml">Post review</button>
+                    </form>
+                }
+            </div>
+        }
     </div>
 
     <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
@@ -157,6 +220,61 @@
             </form>
         }
 
+        @if (canReport)
+        {
+            <div class="card-box" id="report" style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:17px;font-weight:800">Problem at pickup?</span>
+                <span class="muted">If the stall was closed or your products were not there, report it. MarketLink will check both sides.</span>
+                <button type="button" class="btn-ml outline block" onclick="document.getElementById('reportDialog').classList.add('show')">Report the farmer</button>
+            </div>
+        }
+
+        @if (dispute != null && dispute.Status == "open")
+        {
+            <div class="card-box dispute-box" id="report">
+                <span style="font-size:17px;font-weight:800">Under review</span>
+                @if (dispute.CustomerReason == null)
+                {
+                    <span>The farmer reported that you did not come to pick up this order. Please tell us what happened before <strong>@dispute.CreatedAt.AddHours(MarketLink.Services.DisputeService.ReplyHours).ToString("dd/MM/yyyy HH:mm")</strong>.</span>
+                    <span class="muted">Only MarketLink can see your answer. If we find you were at fault you get a warning, and @MarketLink.Services.DisputeService.MaxWarnings warnings lock your account.</span>
+                    <form asp-action="Report" asp-route-id="@Model.OrderId" method="post" class="review-form">
+                        <textarea name="reason" rows="3" maxlength="500" required placeholder="e.g. I came at 7:30 but the stall was closed" aria-label="Your side"></textarea>
+                        <button type="submit" class="btn-ml">Send my side</button>
+                    </form>
+                }
+                else
+                {
+                    <span class="muted">You sent your side on @dispute.CustomerReasonAt!.Value.ToString("dd/MM/yyyy HH:mm"). Only MarketLink can see it.</span>
+                    <p class="desc dispute-quote">@dispute.CustomerReason</p>
+                    <span class="muted">MarketLink is checking this order. We will send you a notification with the result.</span>
+                }
+            </div>
+        }
+
+        @if (dispute != null && dispute.Status == "resolved")
+        {
+            <div class="card-box dispute-box" id="report">
+                <span style="font-size:17px;font-weight:800">Review result</span>
+                @if (dispute.AtFault == "customer")
+                {
+                    <span>MarketLink found that this order was not picked up because of you. You received a warning.</span>
+                }
+                else if (dispute.AtFault == "farmer")
+                {
+                    <span>MarketLink found that the problem was on the farmer's side. You did not get a warning.</span>
+                }
+                else
+                {
+                    <span>MarketLink found a reasonable cause on both sides. No one got a warning.</span>
+                }
+                @if (!string.IsNullOrEmpty(dispute.AdminNote))
+                {
+                    <p class="desc dispute-quote">@dispute.AdminNote</p>
+                }
+                <span class="muted">The order was cancelled on @(dispute.ResolvedAt != null ? dispute.ResolvedAt.Value.ToString("dd/MM/yyyy HH:mm") : "").</span>
+            </div>
+        }
+
         @if (canCancel)
         {
             <div class="card-box" id="cancel">
@@ -179,6 +297,24 @@
             <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
                 <button type="button" class="btn-ml grey" onclick="document.getElementById('cancelDialog').classList.remove('show')">Keep order</button>
                 <button type="submit" class="btn-ml" style="background:#C62828">Yes, cancel order</button>
+            </div>
+        </form>
+    </div>
+}
+
+@if (canReport)
+{
+    <div class="modal-bg" id="reportDialog" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+        <form class="modal-box" asp-action="Report" asp-route-id="@Model.OrderId" method="post">
+            <span id="reportTitle" style="font-size:19px;font-weight:800">Report a problem with order @Model.OrderCode?</span>
+            <span class="muted">The farmer will be asked to send their side. Only MarketLink sees both answers and decides who was at fault.</span>
+            <div class="field">
+                <label for="reportReason">What happened? (required)</label>
+                <textarea id="reportReason" name="reason" rows="3" maxlength="500" required placeholder="e.g. I came at 7:30 but the stall was closed"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                <button type="button" class="btn-ml grey" onclick="document.getElementById('reportDialog').classList.remove('show')">Close</button>
+                <button type="submit" class="btn-ml" style="background:#C62828">Send report</button>
             </div>
         </form>
     </div>

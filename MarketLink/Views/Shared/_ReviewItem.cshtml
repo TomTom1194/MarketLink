@@ -1,0 +1,31 @@
+@model MarketLink.Dtos.ReviewDto
+@using MarketLink.Helpers
+@{
+    string name = Model.CustomerName != "" ? Model.CustomerName : "Customer";
+}
+<div class="review-item">
+    <div style="display:flex;align-items:center;gap:10px">
+        <span class="review-avatar">@name.Substring(0, 1).ToUpper()</span>
+        <span style="display:flex;flex-direction:column;flex:1;min-width:0">
+            <span style="font-size:15px;font-weight:700">@name</span>
+            <span class="muted" style="font-size:14px">@Model.CreatedAt.ToString("dd/MM/yyyy") · ✓ Picked up at market</span>
+        </span>
+        <span class="stars" aria-label="@Model.Rating out of 5 stars">@ShopHelper.Stars(Model.Rating)</span>
+    </div>
+    @if (!string.IsNullOrEmpty(Model.Comment))
+    {
+        <p class="desc" style="margin:0">@Model.Comment</p>
+    }
+    @if (Model.Products.Count > 0)
+    {
+        <div class="review-products" aria-label="Items in this order">
+            @foreach (var p in Model.Products)
+            {
+                <span class="review-product">
+                    <img src="@p.ImageUrl" alt="" loading="lazy" />
+                    <span>@p.ProductName</span>
+                </span>
+            }
+        </div>
+    }
+</div>

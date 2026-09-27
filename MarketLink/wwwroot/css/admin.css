@@ -164,3 +164,6 @@
   .admin-head-link { padding: 0 8px; font-size: 14px; }
   .toolbar form .form-control { min-width: 0; }
 }
+
+/* ----- Pickup reports ----- */
+.dispute-reason { margin: 0 0 6px; padding: 10px 12px; background: var(--bg); border-left: 3px solid var(--line); border-radius: 6px; white-space: pre-line; }

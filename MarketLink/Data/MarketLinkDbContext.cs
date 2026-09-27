@@ -34,4 +34,7 @@ public class MarketLinkDbContext : DbContext
     public DbSet<OrderSnapshot> OrderSnapshots { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<FavoriteFarmer> FavoriteFarmers { get; set; }
+    public DbSet<FarmerReview> FarmerReviews { get; set; }
+    public DbSet<OrderDispute> OrderDisputes { get; set; }
+    public DbSet<UserWarning> UserWarnings { get; set; }
 }

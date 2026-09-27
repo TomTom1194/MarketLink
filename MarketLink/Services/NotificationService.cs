@@ -34,6 +34,11 @@ namespace MarketLink.Services
                 .ToListAsync();
         }
 
+        public async Task<int> CountUnreadAsync(int userId)
+        {
+            return await _context.Notifications.CountAsync(notification => notification.UserId == userId && !notification.IsRead);
+        }
+
         public async Task<bool> MarkAllReadAsync(int userId)
         {
             var unread = await _context.Notifications

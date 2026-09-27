@@ -12,12 +12,16 @@ namespace MarketLink.Controllers
         private readonly ICustomerOrderService _customerOrderService;
         private readonly IFavoriteService _favoriteService;
         private readonly ICartService _cartService;
+        private readonly IReviewService _reviewService;
+        private readonly IDisputeService _disputeService;
 
-        public MyOrdersController(ICustomerOrderService customerOrderService, IFavoriteService favoriteService, ICartService cartService)
+        public MyOrdersController(ICustomerOrderService customerOrderService, IFavoriteService favoriteService, ICartService cartService, IReviewService reviewService, IDisputeService disputeService)
         {
+            _disputeService = disputeService;
             _customerOrderService = customerOrderService;
             _favoriteService = favoriteService;
             _cartService = cartService;
+            _reviewService = reviewService;
         }
 
         [HttpGet]
@@ -99,6 +103,9 @@ namespace MarketLink.Controllers
             }
 
             ViewBag.IsFavorite = await _favoriteService.IsFavoriteAsync(GetCustomerId(), order.Stall!.FarmerId);
+            ViewBag.FarmerReview = await _reviewService.GetOrderFarmerReviewAsync(order.OrderId);
+            ViewBag.Dispute = await _disputeService.GetByOrderAsync(order.OrderId);
+            ViewBag.CanReport = _disputeService.CustomerCanReport(order);
 
             return View(order);
         }
@@ -119,6 +126,24 @@ namespace MarketLink.Controllers
             }
 
             return RedirectToAction("Detail", new { id = id });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Report(int id, string? reason)
+        {
+            string error = await _disputeService.SendCustomerReasonAsync(GetCustomerId(), id, reason);
+
+            if (error != "")
+            {
+                TempData["Error"] = error;
+            }
+            else
+            {
+                TempData["Success"] = "Thanks, we received your side. MarketLink will review this order and let you know the result.";
+            }
+
+            return Redirect(Url.Action("Detail", new { id = id }) + "#report");
         }
 
         [HttpPost]

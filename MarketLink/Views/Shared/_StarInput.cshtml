@@ -1,0 +1,8 @@
+@model string
+<div class="star-input" role="radiogroup" aria-label="Rating">
+    @for (int star = 5; star >= 1; star--)
+    {
+        <input type="radio" id="@(Model)-star@(star)" name="rating" value="@star" required />
+        <label for="@(Model)-star@(star)" title="@star star@(star > 1 ? "s" : "")">★</label>
+    }
+</div>

@@ -9,10 +9,12 @@ namespace MarketLink.Controllers
     public class FavoritesController : Controller
     {
         private readonly IFavoriteService _favoriteService;
+        private readonly IReviewService _reviewService;
 
-        public FavoritesController(IFavoriteService favoriteService)
+        public FavoritesController(IFavoriteService favoriteService, IReviewService reviewService)
         {
             _favoriteService = favoriteService;
+            _reviewService = reviewService;
         }
 
         [HttpGet]
@@ -26,6 +28,7 @@ namespace MarketLink.Controllers
                 farmerIds.Add(f.FarmerId);
             }
             ViewBag.ProductCounts = await _favoriteService.CountProductsOnSaleAsync(farmerIds);
+            ViewBag.FarmerRatings = await _reviewService.GetFarmerRatingsAsync(farmerIds);
 
             return View(favorites);
         }

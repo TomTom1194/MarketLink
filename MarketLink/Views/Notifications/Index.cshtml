@@ -1,7 +1,7 @@
 @model IReadOnlyList<NotificationDto>
 @{ ViewData["Title"] = "Notifications"; ViewData["AccountMenu"] = "notifications"; var unreadCount = (int)(ViewBag.UnreadCount ?? 0); }
 <section class="farmer-page notifications-page">
-    <div class="page-heading"><div><span class="eyebrow">LATEST UPDATES</span><h1>Notifications</h1><p>You have @unreadCount unread @(unreadCount == 1 ? "notification" : "notifications").</p></div>@if (unreadCount > 0) { <form asp-action="MarkAllRead" method="post"><button class="mark-read" type="submit">✓ Mark all as read</button></form> }</div>
+    <div class="page-heading"><div><span class="eyebrow">LATEST UPDATES</span><h1>Notifications</h1><p>@(unreadCount > 0 ? unreadCount + " new " + (unreadCount == 1 ? "notification" : "notifications") + " since your last visit." : "No new notifications.")</p></div></div>
     <div class="order-tabs notification-tabs"><button class="order-tab active" data-notification-filter="all">All <span>@Model.Count</span></button><button class="order-tab" data-notification-filter="orders">Orders</button></div>
     @{ var productAlerts = (List<FarmerProductAlertDto>)ViewBag.ProductAlerts; }
     @if (productAlerts.Count > 0)
@@ -30,8 +30,8 @@
         }
         @foreach (var notification in Model)
         {
-            var iconClass = notification.Type switch { "new_order" => "green", "order_accepted" => "blue", "order_rejected" or "order_cancelled" => "orange", "order_completed" => "purple", _ => "gray" };
-            var icon = notification.Type switch { "new_order" => "▣", "order_accepted" or "order_completed" => "✓", "order_rejected" or "order_cancelled" => "×", _ => "♧" };
+            var iconClass = notification.Type switch { "new_order" => "green", "order_accepted" => "blue", "order_rejected" or "order_cancelled" or "order_disputed" or "account_warning" => "orange", "order_completed" => "purple", "dispute_resolved" => "blue", _ => "gray" };
+            var icon = notification.Type switch { "new_order" => "▣", "order_accepted" or "order_completed" => "✓", "order_rejected" or "order_cancelled" => "×", "order_disputed" or "account_warning" => "!", "dispute_resolved" => "✓", _ => "♧" };
             <article class="notification-card @(notification.IsRead ? "" : "unread")" data-kind="orders">
                 <span class="notification-icon @iconClass">@icon</span>
                 <div class="notification-copy"><div class="notification-title">@notification.Title @if (!notification.IsRead) { <span class="unread-dot"></span> }</div><p>@notification.Message</p></div>

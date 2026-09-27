@@ -1,5 +1,6 @@
 using MarketLink.Data;
 using MarketLink.Dtos.Admin;
+using MarketLink.Helpers;
 using Microsoft.EntityFrameworkCore;
 
 namespace MarketLink.Services.Admin
@@ -9,10 +10,14 @@ namespace MarketLink.Services.Admin
     public class AdminCustomerService : IAdminCustomerService
     {
         private readonly MarketLinkDbContext _context;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<AdminCustomerService> _logger;
 
-        public AdminCustomerService(MarketLinkDbContext context)
+        public AdminCustomerService(MarketLinkDbContext context, IEmailService emailService, ILogger<AdminCustomerService> logger)
         {
             _context = context;
+            _emailService = emailService;
+            _logger = logger;
         }
 
         public async Task<List<CustomerRowDto>> GetCustomersAsync(string? status, string? search)
@@ -52,7 +57,28 @@ namespace MarketLink.Services.Admin
 
         public async Task<bool> LockAsync(int userId)
         {
-            return await SetStatusAsync(userId, "disabled");
+            bool changed = await SetStatusAsync(userId, "disabled");
+            if (!changed)
+            {
+                return false;
+            }
+
+            var customer = await _context.CustomerProfiles
+                .Include(c => c.User)
+                .FirstOrDefaultAsync(c => c.CustomerId == userId);
+            if (customer != null && customer.User != null)
+            {
+                try
+                {
+                    await _emailService.SendAsync(customer.User.Email, customer.FullName, AccountLockHelper.Subject,
+                        AccountLockHelper.BuildEmail(customer.FullName, "Your account was locked by a MarketLink administrator."));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Could not send the account locked email to {Email}", customer.User.Email);
+                }
+            }
+            return true;
         }
 
         public async Task<bool> UnlockAsync(int userId)

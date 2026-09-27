@@ -1,6 +1,8 @@
 @model OrderDetailDto
 @{
     ViewData["Title"] = "Order details";
+    OrderDispute? dispute = ViewBag.Dispute;
+    bool canReport = ViewBag.CanReport;
 
     string status = Model.Status.ToLowerInvariant();
     string statusText = status switch
@@ -11,6 +13,7 @@
         "rejected" => "Rejected",
         "cancelled" => "Cancelled",
         "no_show" => "No-show",
+        "disputed" => "Under review by MarketLink",
         _ => Model.Status
     };
     string statusClass = status switch
@@ -128,17 +131,62 @@
                 <div class="decision-hint">An accepted order can no longer be cancelled. Confirming marks the reserved quantity as sold and tells the customer the order is complete.</div>
 
                 <div class="decision-divider"><span>customer did not come</span></div>
-                @if (DateTime.Now >= Model.PickupEnd)
+                @if (canReport)
                 {
-                    <form asp-action="NoShow" method="post" onsubmit="return confirm('Mark this order as no-show? The products will go back on sale.');">
+                    <form asp-action="Report" method="post" onsubmit="return confirm('Report this customer for not picking up the order? MarketLink will review it.');">
                         <input type="hidden" name="id" value="@Model.Id" />
-                        <button class="btn-reject" type="submit">No-show · return to stock</button>
+                        <label for="report-reason">What happened?</label>
+                        <textarea id="report-reason" name="reason" maxlength="500" required placeholder="e.g. I waited at the stall until 8:00 and the customer did not come or answer the phone"></textarea>
+                        <button class="btn-reject" type="submit">Report no-show</button>
                     </form>
+                    <div class="decision-hint">The customer will be asked for their side. MarketLink reviews both and decides. The reserved quantity stays aside until then. If nobody reports by @Model.PickupEnd.AddHours(MarketLink.Services.AutoCancelService.WaitHours).ToString("dd/MM/yyyy HH:mm"), the order is cancelled automatically.</div>
                 }
                 else
                 {
-                    <div class="decision-hint">You can mark a no-show after the pickup time ends (@Model.PickupEnd.ToString("dd/MM/yyyy HH:mm")).</div>
+                    <div class="decision-hint">You can report a no-show after the pickup time ends (@Model.PickupEnd.ToString("dd/MM/yyyy HH:mm")) and until @Model.PickupEnd.AddHours(MarketLink.Services.AutoCancelService.WaitHours).ToString("dd/MM/yyyy HH:mm"). After that the order is cancelled automatically.</div>
                 }
+            }
+            else if (status == "disputed" && dispute != null)
+            {
+                <h2>Under review</h2>
+                @if (dispute.FarmerReason == null)
+                {
+                    <p>The customer reported a problem with this pickup. Please send your side before <strong>@dispute.CreatedAt.AddHours(MarketLink.Services.DisputeService.ReplyHours).ToString("dd/MM/yyyy HH:mm")</strong>.</p>
+                    <form asp-action="Report" method="post">
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <label for="report-reason">Your side</label>
+                        <textarea id="report-reason" name="reason" maxlength="500" required placeholder="e.g. I was at the stall the whole time and had the order ready"></textarea>
+                        <button class="btn-accept" type="submit">Send my side</button>
+                    </form>
+                    <div class="decision-hint">Only MarketLink can see your answer. If we find you were at fault you get a warning, and @MarketLink.Services.DisputeService.MaxWarnings warnings lock your account.</div>
+                }
+                else
+                {
+                    <p>You sent your side on @dispute.FarmerReasonAt!.Value.ToString("dd/MM/yyyy HH:mm"). Only MarketLink can see it.</p>
+                    <div class="decision-hint">@dispute.FarmerReason</div>
+                    <p>MarketLink is checking this order. You will get a notification with the result.</p>
+                }
+            }
+            else if (dispute != null && dispute.Status == "resolved")
+            {
+                <h2>Review result</h2>
+                @if (dispute.AtFault == "farmer")
+                {
+                    <p>MarketLink found that the problem was on your side. You received a warning.</p>
+                }
+                else if (dispute.AtFault == "customer")
+                {
+                    <p>MarketLink found that the customer was at fault. You did not get a warning.</p>
+                }
+                else
+                {
+                    <p>MarketLink found a reasonable cause on both sides. No one got a warning.</p>
+                }
+                @if (!string.IsNullOrEmpty(dispute.AdminNote))
+                {
+                    <div class="decision-hint">@dispute.AdminNote</div>
+                }
+                <p>The order was cancelled and the reserved quantity is back on sale.</p>
             }
             else
             {

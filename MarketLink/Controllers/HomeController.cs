@@ -8,10 +8,12 @@ namespace MarketLink.Controllers;
 public class HomeController : Controller
 {
     private readonly IShopService _shopService;
+    private readonly IReviewService _reviewService;
 
-    public HomeController(IShopService shopService)
+    public HomeController(IShopService shopService, IReviewService reviewService)
     {
         _shopService = shopService;
+        _reviewService = reviewService;
     }
 
     public async Task<IActionResult> Index()
@@ -37,8 +39,21 @@ public class HomeController : Controller
         ViewBag.CurrentMarket = currentMarket;
         ViewBag.Categories = await _shopService.GetCategoriesAsync();
         ViewBag.Markets = await _shopService.GetActiveMarketsAsync(12);
-        ViewBag.NewestProducts = await _shopService.GetNewestProductsAsync(marketId, 12);
-        ViewBag.Farmers = await _shopService.GetFeaturedFarmersAsync(6);
+        var newestProducts = await _shopService.GetNewestProductsAsync(marketId, 12);
+        var farmers = await _shopService.GetFeaturedFarmersAsync(6);
+        ViewBag.NewestProducts = newestProducts;
+        ViewBag.Farmers = farmers;
+
+        var farmerIds = new List<int>();
+        foreach (var sp in newestProducts)
+        {
+            farmerIds.Add(sp.Product!.FarmerId);
+        }
+        foreach (var f in farmers)
+        {
+            farmerIds.Add(f.FarmerId);
+        }
+        ViewBag.FarmerRatings = await _reviewService.GetFarmerRatingsAsync(farmerIds);
 
         return View();
     }

@@ -1,5 +1,6 @@
 using MarketLink.Data;
 using MarketLink.Dtos.Admin;
+using MarketLink.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace MarketLink.Services.Admin
@@ -32,6 +33,11 @@ namespace MarketLink.Services.Admin
                     .Where(o => o.Status == "completed" && o.CompletedAt >= firstDayOfMonth)
                     .SumAsync(o => (decimal?)o.TotalAmount) ?? 0
             };
+
+            DateTime replyDeadline = DateTime.Now.AddHours(-DisputeService.ReplyHours);
+            dashboard.OpenReports = await _context.OrderDisputes.CountAsync(d => d.Status == "open");
+            dashboard.ReadyReports = await _context.OrderDisputes.CountAsync(d => d.Status == "open"
+                && ((d.CustomerReason != null && d.FarmerReason != null) || d.CreatedAt <= replyDeadline));
 
             dashboard.LatestPendingFarmers = await _context.FarmerProfiles
                 .Where(f => f.ApprovalStatus == "pending")

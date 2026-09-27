@@ -1,0 +1,19 @@
+@model MarketLink.Dtos.RatingSummaryDto
+@using MarketLink.Helpers
+<div class="rating-summary">
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="rating-big">@Model.Average.ToString("0.0")</span>
+        <span style="display:flex;flex-direction:column">
+            <span class="stars" style="font-size:18px">@ShopHelper.Stars(Model.Average)</span>
+            <span class="muted" style="font-size:14px">@Model.Count review@(Model.Count > 1 ? "s" : "")</span>
+        </span>
+    </div>
+    @for (int star = 5; star >= 1; star--)
+    {
+        <div class="rating-bar-row">
+            <span style="font-weight:600">@star ★</span>
+            <span class="rating-bar"><span style="width:@(Model.Percent(star))%"></span></span>
+            <span style="text-align:right;color:#4A5550">@Model.StarCounts[star]</span>
+        </div>
+    }
+</div>
