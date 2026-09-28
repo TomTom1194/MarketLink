@@ -1,7 +1,7 @@
 USE [MarketDB];
 GO
 
--- Danh mục đơn vị cho form sản phẩm. Không thay đổi các bản ghi Products hiện có.
+-- English unit choices for the farmer product form. Existing products are unchanged.
 IF OBJECT_ID(N'dbo.Product_Unit', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.Product_Unit
@@ -16,11 +16,10 @@ GO
 WITH Units(unit, sort_order) AS
 (
     SELECT unit, sort_order FROM (VALUES
-        (N'kg', 1), (N'g', 2), (N'lạng', 3), (N'tạ', 4),
-        (N'tấn', 5), (N'lít', 6), (N'ml', 7), (N'bó', 8),
-        (N'mớ', 9), (N'củ', 10), (N'quả', 11), (N'trái', 12),
-        (N'chiếc', 13), (N'cái', 14), (N'túi', 15),
-        (N'hộp', 16), (N'thùng', 17)
+        (N'kg', 1), (N'g', 2), (N'100 g', 3), (N'100 kg', 4),
+        (N'tonne', 5), (N'liter', 6), (N'ml', 7), (N'bunch', 8),
+        (N'bundle', 9), (N'root', 10), (N'fruit', 11),
+        (N'piece', 12), (N'bag', 13), (N'box', 14), (N'carton', 15)
     ) AS source(unit, sort_order)
 )
 INSERT INTO dbo.Product_Unit(unit, sort_order)
