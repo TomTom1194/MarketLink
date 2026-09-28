@@ -5,6 +5,9 @@ namespace MarketLink.Dtos
 {
     public class CreateFarmerProductDto
     {
+        // Picked from the ready-made list (Product_Template). Empty = the farmer typed the product by hand.
+        public int? TemplateId { get; set; }
+
         [Range(1, int.MaxValue, ErrorMessage = "Select a category")]
         public int CategoryId { get; set; }
 

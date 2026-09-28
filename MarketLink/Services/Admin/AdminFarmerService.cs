@@ -63,6 +63,7 @@ namespace MarketLink.Services.Admin
                     ApprovedAt = f.ApprovedAt,
                     StallCount = f.Stalls.Count,
                     ProductCount = f.Products.Count,
+                    WarningCount = _context.UserWarnings.Count(w => w.UserId == f.FarmerId),
                     FirstStall = f.Stalls
                         .OrderBy(s => s.StallId)
                         .Select(s => new FarmerStallDto
@@ -114,6 +115,7 @@ namespace MarketLink.Services.Admin
                     ApprovedAt = f.ApprovedAt,
                     ApprovedByEmail = f.ApprovedByUser != null ? f.ApprovedByUser.Email : null,
                     ProductCount = f.Products.Count,
+                    WarningCount = _context.UserWarnings.Count(w => w.UserId == f.FarmerId),
                     Stalls = f.Stalls
                         .OrderBy(s => s.StallId)
                         .Select(s => new FarmerStallDto
@@ -156,9 +158,14 @@ namespace MarketLink.Services.Admin
             if (farmer.ApprovalStatus == "suspended")
             {
                 farmer.ApprovalStatus = "approved";
+                farmer.User.Status = "active";   // a farmer locked after 3 warnings can log in again too
+                farmer.User.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
 
                 result.Reactivated = true;
+                await SendEmailAsync(farmer.User.Email, farmer.ContactPerson,
+                    "Your MarketLink farmer account is active again",
+                    BuildReactivatedEmail(farmer.ContactPerson, farmer.BrandName, loginUrl));
                 return result;
             }
 
@@ -242,7 +249,9 @@ namespace MarketLink.Services.Admin
 
         public async Task<bool> SuspendAsync(int farmerId)
         {
-            var farmer = await _context.FarmerProfiles.FindAsync(farmerId);
+            var farmer = await _context.FarmerProfiles
+                .Include(f => f.User)
+                .FirstOrDefaultAsync(f => f.FarmerId == farmerId);
             if (farmer == null || farmer.ApprovalStatus != "approved")
             {
                 return false;
@@ -250,7 +259,25 @@ namespace MarketLink.Services.Admin
 
             farmer.ApprovalStatus = "suspended";
             await _context.SaveChangesAsync();
+
+            // Let the farmer know. If the email fails, the suspension still counts.
+            await SendEmailAsync(farmer.User!.Email, farmer.ContactPerson,
+                "Your MarketLink stall has been suspended",
+                BuildSuspendedEmail(farmer.ContactPerson, farmer.BrandName));
             return true;
+        }
+
+        // Sends an email; a failed email is only logged (the admin action is already saved)
+        private async Task SendEmailAsync(string email, string name, string subject, string htmlBody)
+        {
+            try
+            {
+                await _emailService.SendAsync(email, name, subject, htmlBody);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not send the email \"{Subject}\" to {Email}", subject, email);
+            }
         }
 
         // ===== Email content =====
@@ -275,6 +302,36 @@ namespace MarketLink.Services.Admin
     <tr><td style=""padding:4px 16px 4px 0;color:#5f6b63"">Password</td><td style=""font-family:monospace;font-size:17px""><strong>{safePassword}</strong></td></tr>
   </table>
   <p>Please keep this password private and change it after your first login.</p>
+  <p>The MarketLink team</p>
+</div>";
+        }
+
+        private static string BuildSuspendedEmail(string contactPerson, string brandName)
+        {
+            string name = WebUtility.HtmlEncode(contactPerson);
+            string brand = WebUtility.HtmlEncode(brandName);
+
+            return $@"
+<div style=""font-family:Arial,sans-serif;font-size:15px;color:#1d2620;line-height:1.6"">
+  <p>Hello {name},</p>
+  <p>The stall of <strong>{brand}</strong> on MarketLink has been <strong>suspended</strong> by an administrator.</p>
+  <p>While suspended, your products are hidden from customers and you cannot receive new orders.</p>
+  <p>If you think this is a mistake, please reply to this email or contact the MarketLink team.</p>
+  <p>The MarketLink team</p>
+</div>";
+        }
+
+        private static string BuildReactivatedEmail(string contactPerson, string brandName, string loginUrl)
+        {
+            string name = WebUtility.HtmlEncode(contactPerson);
+            string brand = WebUtility.HtmlEncode(brandName);
+            string safeUrl = WebUtility.HtmlEncode(loginUrl);
+
+            return $@"
+<div style=""font-family:Arial,sans-serif;font-size:15px;color:#1d2620;line-height:1.6"">
+  <p>Hello {name},</p>
+  <p>Good news: <strong>{brand}</strong> is active again on MarketLink. Your products can be seen by customers and you can receive orders.</p>
+  <p>Log in with your old password: <a href=""{safeUrl}"">{safeUrl}</a></p>
   <p>The MarketLink team</p>
 </div>";
         }

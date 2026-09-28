@@ -14,6 +14,7 @@ public class MarketLinkDbContext : DbContext
     
     public DbSet<Role> Roles { get; set; }
     public DbSet<FarmerCategory> FarmerCategories { get; set; }
+    public DbSet<ProductTemplate> ProductTemplates { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<CustomerProfile> CustomerProfiles { get; set; }
     public DbSet<FarmerProfile> FarmerProfiles { get; set; }

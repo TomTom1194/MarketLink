@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Add product";
     Layout = "~/Views/Shared/_FarmerLayout.cshtml";
+    var templates = ViewBag.Templates as List<MarketLink.Models.ProductTemplate> ?? new List<MarketLink.Models.ProductTemplate>();
 }
 
 <div class="mb-4">
@@ -14,6 +15,26 @@
     <form asp-action="Create" method="post" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
         <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        @* ===== Step 1: pick a ready-made product, or type it by hand ===== *@
+        <div class="rounded-3 border bg-light p-3 mb-4">
+            <label asp-for="TemplateId" class="form-label fw-semibold">Choose a product</label>
+            <select asp-for="TemplateId" class="form-select">
+                <option value="">Other – I will type the product myself</option>
+                @foreach (var group in templates.GroupBy(t => t.Category!.CategoryName))
+                {
+                    <optgroup label="@group.Key">
+                        @foreach (var template in group)
+                        {
+                            <option value="@template.TemplateId" data-name="@template.ProductName"
+                                    data-category="@template.CategoryId" data-unit="@template.Unit">@template.ProductName (@template.Unit)</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+            <span asp-validation-for="TemplateId" class="text-danger small"></span>
+            <div id="templateHint" class="small text-muted mt-2"></div>
+        </div>
+
         <div class="row g-4">
             <div class="col-12 col-lg-7">
                 <div class="mb-3">
@@ -65,7 +86,39 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <partial name="_UnitFilterScript" />
     <script>
+        // Template picked: fill name, category and unit and lock them.
+        // "Other": the farmer types them; the name is then checked by AI when saving.
+        const templateSelect = document.getElementById('TemplateId');
+        const nameInput = document.getElementById('ProductName');
+        const categorySelect = document.getElementById('CategoryId');
+        const unitSelect = document.getElementById('Unit');
+        const lockable = [categorySelect, unitSelect];
+
+        function applyTemplate() {
+            const option = templateSelect.selectedOptions[0];
+            const fromTemplate = option && option.value !== '';
+            if (fromTemplate) {
+                nameInput.value = option.dataset.name;
+                categorySelect.value = option.dataset.category;
+                refreshUnits(); // load the units of the template's category first
+                unitSelect.value = option.dataset.unit;
+            }
+            nameInput.readOnly = fromTemplate;
+            lockable.forEach(el => {
+                el.style.pointerEvents = fromTemplate ? 'none' : '';
+                el.tabIndex = fromTemplate ? -1 : 0;
+                el.classList.toggle('bg-light', fromTemplate);
+            });
+            nameInput.classList.toggle('bg-light', fromTemplate);
+            document.getElementById('templateHint').textContent = fromTemplate
+                ? 'Name, category and unit come from the template.'
+                : 'Typing your own name? The name and unit will be checked by AI to make sure they fit the category.';
+        }
+        templateSelect.addEventListener('change', applyTemplate);
+        applyTemplate();
+
         document.getElementById('Image').addEventListener('change', event => {
             const file = event.target.files[0];
             if (!file) return;

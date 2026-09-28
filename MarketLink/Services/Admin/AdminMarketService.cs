@@ -119,7 +119,7 @@ namespace MarketLink.Services.Admin
             }
 
             // Two markets in the same district cannot have the same name
-            string name = model.MarketName.Trim();
+            string name = (model.MarketName ?? "").Trim();   // an empty text box arrives as null
             bool duplicate = await _context.Markets.AnyAsync(m =>
                 m.DistrictId == model.DistrictId &&
                 m.MarketName == name &&

@@ -21,6 +21,9 @@ namespace MarketLink.Dtos.Admin
         public int StallCount { get; set; }
         public int ProductCount { get; set; }
 
+        // Warnings from pickup reports (DisputeService.MaxWarnings warnings lock the account)
+        public int WarningCount { get; set; }
+
         // First stall of the farmer (the one from the application)
         public FarmerStallDto? FirstStall { get; set; }
     }

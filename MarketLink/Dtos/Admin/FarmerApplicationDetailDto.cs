@@ -27,6 +27,9 @@ namespace MarketLink.Dtos.Admin
 
         // ----- Selling -----
         public int ProductCount { get; set; }
+
+        // Warnings from pickup reports (DisputeService.MaxWarnings warnings lock the account)
+        public int WarningCount { get; set; }
         public List<FarmerStallDto> Stalls { get; set; } = new List<FarmerStallDto>();
     }
 }

@@ -30,7 +30,7 @@ namespace MarketLink.Areas.Admin.Controllers
         public async Task<IActionResult> Lock(int id, string? returnStatus)
         {
             if (await _customerService.LockAsync(id))
-                TempData["Success"] = "The account was locked.";
+                TempData["Success"] = "The account was locked and the customer was notified by email.";
             else
                 TempData["Error"] = "Customer not found.";
 
@@ -41,8 +41,9 @@ namespace MarketLink.Areas.Admin.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Unlock(int id, string? returnStatus)
         {
-            if (await _customerService.UnlockAsync(id))
-                TempData["Success"] = "The account was unlocked.";
+            string loginUrl = Url.Action("Login", "Account", new { area = "" }, Request.Scheme)!;
+            if (await _customerService.UnlockAsync(id, loginUrl))
+                TempData["Success"] = "The account was unlocked and the customer was notified by email.";
             else
                 TempData["Error"] = "Customer not found.";
 

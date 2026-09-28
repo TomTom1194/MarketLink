@@ -1,0 +1,99 @@
+@model ProductTemplateFormDto
+@{
+    ViewData["Title"] = "Product templates";
+    Layout = "_AdminLayout";
+
+    var templates = (List<ProductTemplate>)ViewBag.Templates;
+    int? filterCategoryId = ViewBag.FilterCategoryId;
+}
+
+<p class="text-muted m-0">
+    Farmers pick one of these when they add a product, so the name, category and unit always match.
+    Names they type in by hand are checked by AI against the category.
+</p>
+
+@* ===== Add a template ===== *@
+<div class="admin-card">
+    <form asp-action="Create" method="post" class="row g-3 align-items-end" novalidate>
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="col-md-4">
+            <label asp-for="CategoryId" class="form-label"></label>
+            <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-select">
+                <option value="0">-- Choose --</option>
+            </select>
+            <span asp-validation-for="CategoryId" class="text-danger small"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="ProductName" class="form-label"></label>
+            <input asp-for="ProductName" class="form-control" placeholder="e.g. Bok Choy" />
+            <span asp-validation-for="ProductName" class="text-danger small"></span>
+        </div>
+        <div class="col-md-2">
+            <label asp-for="Unit" class="form-label"></label>
+            <select asp-for="Unit" asp-items="ViewBag.Units" class="form-select">
+                <option value="">-- Unit --</option>
+            </select>
+            <span asp-validation-for="Unit" class="text-danger small"></span>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-success">+ Add</button>
+        </div>
+    </form>
+</div>
+
+@* ===== List ===== *@
+<div class="toolbar">
+    <form method="get" asp-action="Index">
+        <select name="categoryId" asp-items="ViewBag.FilterCategories" class="form-select" onchange="this.form.submit()">
+            <option value="">All categories</option>
+        </select>
+    </form>
+    <span class="text-muted small">@templates.Count @(templates.Count == 1 ? "template" : "templates")</span>
+</div>
+
+@if (templates.Count == 0)
+{
+    <div class="admin-card text-muted">No templates yet. Run Database/Update_08_product_template.sql for the default list, or add some above.</div>
+}
+else
+{
+    <div class="admin-table">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Product name</th>
+                <th>Category</th>
+                <th>Unit</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var template in templates)
+            {
+                <tr>
+                    <td class="fw-semibold">@template.ProductName</td>
+                    <td>@template.Category?.CategoryName</td>
+                    <td>@template.Unit</td>
+                    <td><span class="status-pill @(template.IsActive ? "status-active" : "status-hidden")">@(template.IsActive ? "shown" : "hidden")</span></td>
+                    <td>
+                        <div class="actions">
+                            <form asp-action="Toggle" asp-route-id="@template.TemplateId" asp-route-categoryId="@filterCategoryId" method="post">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">@(template.IsActive ? "Hide" : "Show")</button>
+                            </form>
+                            <form asp-action="Delete" asp-route-id="@template.TemplateId" asp-route-categoryId="@filterCategoryId" method="post"
+                                  onsubmit="return confirm('Delete this template? Products already posted are not affected.');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+    <partial name="~/Views/Shared/_UnitFilterScript.cshtml" />
+}

@@ -50,7 +50,7 @@ namespace MarketLink.Services.Admin
         public async Task<Dictionary<string, string>> ValidateAsync(ProductExpFormDto model)
         {
             var errors = new Dictionary<string, string>();
-            string code = model.ExpCode.Trim().ToUpper();
+            string code = (model.ExpCode ?? "").Trim().ToUpper();   // an empty text box arrives as null
 
             if (await _context.ProductExps.AnyAsync(e => e.ExpCode == code && e.ExpId != (model.ExpId ?? 0)))
             {

@@ -50,7 +50,9 @@ namespace MarketLink.Services.Admin
                     CityName = c.District.City!.CityName,
                     Status = c.User.Status,
                     CreatedAt = c.CreatedAt,
-                    OrderCount = c.Orders.Count
+                    OrderCount = c.Orders.Count,
+                    WarningCount = _context.UserWarnings.Count(w => w.UserId == c.CustomerId),
+                    NoShowCount = c.Orders.Count(o => o.Status == "no_show")
                 })
                 .ToListAsync();
         }
@@ -81,9 +83,30 @@ namespace MarketLink.Services.Admin
             return true;
         }
 
-        public async Task<bool> UnlockAsync(int userId)
+        public async Task<bool> UnlockAsync(int userId, string loginUrl)
         {
-            return await SetStatusAsync(userId, "active");
+            bool changed = await SetStatusAsync(userId, "active");
+            if (!changed)
+            {
+                return false;
+            }
+
+            var customer = await _context.CustomerProfiles
+                .Include(c => c.User)
+                .FirstOrDefaultAsync(c => c.CustomerId == userId);
+            if (customer != null && customer.User != null)
+            {
+                try
+                {
+                    await _emailService.SendAsync(customer.User.Email, customer.FullName, AccountLockHelper.UnlockSubject,
+                        AccountLockHelper.BuildUnlockEmail(customer.FullName, loginUrl));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Could not send the account unlocked email to {Email}", customer.User.Email);
+                }
+            }
+            return true;
         }
 
         private async Task<bool> SetStatusAsync(int userId, string status)

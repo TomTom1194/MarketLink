@@ -167,3 +167,19 @@
 
 /* ----- Pickup reports ----- */
 .dispute-reason { margin: 0 0 6px; padding: 10px 12px; background: var(--bg); border-left: 3px solid var(--line); border-radius: 6px; white-space: pre-line; }
+
+/* ===== Warnings: highlight customers / farmers at risk of being locked ===== */
+.risk-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--text-2); margin: 0 0 10px; }
+.risk-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.risk-dot-high { background: #D32F2F; }
+.risk-dot-low  { background: #E0A100; }
+
+.admin-table tr.risk-high > td { background: #FDECEA; }
+.admin-table tr.risk-high > td:first-child { box-shadow: inset 4px 0 0 #D32F2F; }
+.admin-table tr.risk-low > td  { background: #FFF8E1; }
+.admin-table tr.risk-low > td:first-child  { box-shadow: inset 4px 0 0 #E0A100; }
+
+.warn-count { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+              background: var(--yellow-light); color: #7A5208; white-space: nowrap; }
+.warn-count.warn-high { background: #D32F2F; color: #fff; }
+
