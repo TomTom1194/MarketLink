@@ -11,6 +11,21 @@ public class MarketLinkDbContext : DbContext
 
     protected MarketLinkDbContext(){}
 
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // SQL Server rejects multiple cascade paths between users, profiles and their data.
+        // Deleting a parent with dependent records must be handled explicitly by the application.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var foreignKey in entityType.GetForeignKeys())
+            {
+                foreignKey.DeleteBehavior = DeleteBehavior.NoAction;
+            }
+        }
+    }
+
     
     public DbSet<Role> Roles { get; set; }
     public DbSet<User> Users { get; set; }

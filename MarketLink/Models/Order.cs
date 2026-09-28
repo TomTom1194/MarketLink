@@ -72,6 +72,10 @@ namespace MarketLink.Models
         [Column("accepted_at")]
         public DateTime? AcceptedAt { get; set; }
 
+        // Set after a failed auto acceptance so the farmer and customer are notified once.
+        [Column("auto_accept_failed_at")]
+        public DateTime? AutoAcceptFailedAt { get; set; }
+
         [Column("rejected_at")]
         public DateTime? RejectedAt { get; set; }
 

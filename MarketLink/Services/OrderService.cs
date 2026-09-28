@@ -8,6 +8,7 @@ namespace MarketLink.Services
 {
     public class OrderService : IOrderService
     {
+        public static readonly TimeSpan AutoAcceptDelay = TimeSpan.FromMinutes(5);
         private readonly MarketLinkDbContext _context;
 
         public OrderService(MarketLinkDbContext context)
@@ -75,20 +76,97 @@ namespace MarketLink.Services
             return order == null ? null : MapDetail(order);
         }
 
-        public async Task<bool> AcceptOrderAsync(int id, int farmerId)
+        public Task<bool> AcceptOrderAsync(int id, int farmerId) => AcceptOrderCoreAsync(id, farmerId, automated: false);
+
+        public async Task<bool> AutoAcceptOrderAsync(int id)
+        {
+            try
+            {
+                return await AcceptOrderCoreAsync(id, null, automated: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // The stock transaction has rolled back. A separate transaction records the warning once.
+                _context.ChangeTracker.Clear();
+                await RecordAutoAcceptFailureAsync(id);
+                return false;
+            }
+        }
+
+        public async Task<bool> GetAutoAcceptEnabledAsync(int farmerId)
+        {
+            return await _context.Stalls.AsNoTracking()
+                .Where(stall => stall.FarmerId == farmerId && stall.IsActive)
+                .Select(stall => stall.AutoAcceptEnabled)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<bool> SetAutoAcceptEnabledAsync(int farmerId, bool enabled)
+        {
+            var stall = await _context.Stalls.FirstOrDefaultAsync(item => item.FarmerId == farmerId && item.IsActive);
+            if (stall == null) return false;
+
+            stall.AutoAcceptEnabled = enabled;
+            stall.AutoAcceptEnabledAt = enabled ? DateTime.Now : null;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        private async Task<bool> AcceptOrderCoreAsync(int id, int? farmerId, bool automated)
         {
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             var order = await GetTrackedOrderAsync(id, farmerId);
             if (order == null || !IsStatus(order, "placed")) return false;
 
-            // Step 2: stock is taken only when the farmer accepts the order
+            if (automated)
+            {
+                var stall = order.Stall!;
+                if (!stall.IsActive || stall.Farmer?.ApprovalStatus != "approved" ||
+                    !stall.AutoAcceptEnabled || stall.AutoAcceptEnabledAt == null ||
+                    order.PlacedAt < stall.AutoAcceptEnabledAt || order.AutoAcceptFailedAt != null ||
+                    order.PlacedAt > DateTime.Now - AutoAcceptDelay) return false;
+            }
+
+            // Both the button and the background worker reserve stock before accepting the order.
             await ReserveStockAsync(order);
             order.Status = "accepted";
             order.AcceptedAt = DateTime.Now;
-            AddCustomerNotification(order, "order_accepted", $"Order #{order.OrderCode} was accepted", "The farmer accepted your order. See you at the pickup time you chose.");
+            AddCustomerNotification(order, "order_accepted", $"Order #{order.OrderCode} was accepted", automated
+                ? "The stall automatically accepted your order. Your products are reserved for pickup."
+                : "The farmer accepted your order. See you at the pickup time you chose.");
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
             return true;
+        }
+
+        private async Task RecordAutoAcceptFailureAsync(int id)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var order = await GetTrackedOrderAsync(id, null);
+            if (order == null || !IsStatus(order, "placed") || order.AutoAcceptFailedAt != null ||
+                order.Stall?.AutoAcceptEnabled != true) return;
+
+            order.AutoAcceptFailedAt = DateTime.Now;
+            _context.Notifications.Add(new Notification
+            {
+                UserId = order.Stall.FarmerId,
+                OrderId = order.OrderId,
+                Type = "new_order",
+                Title = $"Order #{order.OrderCode} needs your attention",
+                Body = "Automatic acceptance could not reserve enough stock. The order is still waiting for your decision.",
+                CreatedAt = DateTime.Now
+            });
+            _context.Notifications.Add(new Notification
+            {
+                UserId = order.CustomerId,
+                OrderId = order.OrderId,
+                Type = "new_order",
+                Title = $"Order #{order.OrderCode} is still waiting",
+                Body = "The stall could not confirm your order automatically. The farmer will review it.",
+                CreatedAt = DateTime.Now
+            });
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         public async Task<bool> RejectOrderAsync(int id, int farmerId, string reason)
@@ -127,10 +205,13 @@ namespace MarketLink.Services
             return true;
         }
 
-        private Task<Order?> GetTrackedOrderAsync(int id, int farmerId) => _context.Orders
-            .Where(o => o.OrderId == id && o.Stall != null && o.Stall.FarmerId == farmerId)
-            .Include(o => o.Items)
-            .FirstOrDefaultAsync();
+        private Task<Order?> GetTrackedOrderAsync(int id, int? farmerId)
+        {
+            var query = _context.Orders.Where(o => o.OrderId == id).Include(o => o.Items)
+                .Include(o => o.Stall).ThenInclude(stall => stall!.Farmer).AsQueryable();
+            if (farmerId.HasValue) query = query.Where(o => o.Stall != null && o.Stall.FarmerId == farmerId.Value);
+            return query.FirstOrDefaultAsync();
+        }
 
         // Step 2 (accept): move the ordered quantity into quantity_reserved,
         // so it is no longer available to other customers.
@@ -140,23 +221,29 @@ namespace MarketLink.Services
             {
                 // The price row saved with the order may have been closed since
                 // (the farmer changed the price). Then use the row that is on sale now.
-                var stock = await _context.StockPrices.FirstOrDefaultAsync(sp => sp.StockPriceId == item.StockPriceId);
+                var stock = await _context.StockPrices.AsNoTracking().FirstOrDefaultAsync(sp => sp.StockPriceId == item.StockPriceId);
                 if (stock == null || stock.EffectiveTo != null)
                 {
-                    stock = await _context.StockPrices
+                    stock = await _context.StockPrices.AsNoTracking()
                         .Where(sp => sp.ProductId == item.ProductId && sp.StallId == order.StallId && sp.EffectiveTo == null)
                         .OrderByDescending(sp => sp.EffectiveFrom)
                         .FirstOrDefaultAsync();
                 }
 
-                if (stock == null || stock.QuantityAvailable < item.Quantity)
+                if (stock == null || item.Quantity <= 0)
                 {
-                    decimal left = stock == null ? 0 : stock.QuantityAvailable;
-                    throw new InvalidOperationException(
-                        $"Not enough stock for {item.ProductName}: the order needs {item.Quantity:0.##} {item.Unit} but only {left:0.##} {item.Unit} are left. Reject the order or re-up the product first.");
+                    throw new InvalidOperationException($"No valid stock is available for {item.ProductName}. The order is still waiting for a decision.");
                 }
 
-                stock.QuantityReserved += item.Quantity;
+                // One conditional SQL update checks and reserves the stock atomically.
+                int updated = await _context.StockPrices
+                    .Where(sp => sp.StockPriceId == stock.StockPriceId && sp.StallId == order.StallId &&
+                        sp.EffectiveTo == null && sp.QuantityIn - sp.QuantityReserved - sp.QuantitySold >= item.Quantity)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(sp => sp.QuantityReserved, sp => sp.QuantityReserved + item.Quantity));
+                if (updated != 1)
+                {
+                    throw new InvalidOperationException($"Not enough stock for {item.ProductName}. The order is still waiting for a decision.");
+                }
 
                 // Remember which row holds the reservation (the price the customer pays does not change)
                 item.StockPriceId = stock.StockPriceId;

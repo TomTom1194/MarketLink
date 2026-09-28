@@ -42,6 +42,13 @@ namespace MarketLink.Models
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 
+        // Farmer-controlled switch. Only orders placed after this time are auto accepted.
+        [Column("auto_accept_enabled")]
+        public bool AutoAcceptEnabled { get; set; }
+
+        [Column("auto_accept_enabled_at")]
+        public DateTime? AutoAcceptEnabledAt { get; set; }
+
         [ForeignKey("MarketId")]
         public Market? Market { get; set; }
 

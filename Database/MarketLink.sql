@@ -91,6 +91,8 @@ CREATE TABLE Stalls (
     google_url     NVARCHAR(500) NULL,                -- Google Maps link to the stall
     selling_days   NVARCHAR(20) NOT NULL,             -- e.g. '4,7'
     is_active      BIT NOT NULL DEFAULT 1,
+    auto_accept_enabled BIT NOT NULL DEFAULT 0,
+    auto_accept_enabled_at DATETIME2 NULL,
     UNIQUE (market_id, stall_code)
 );
 
@@ -194,6 +196,7 @@ CREATE TABLE Orders (
     cancel_reason  NVARCHAR(500) NULL,                -- required when the customer cancels
     placed_at      DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     accepted_at    DATETIME2 NULL,
+    auto_accept_failed_at DATETIME2 NULL,
     rejected_at    DATETIME2 NULL,
     cancelled_at   DATETIME2 NULL,
     completed_at   DATETIME2 NULL,

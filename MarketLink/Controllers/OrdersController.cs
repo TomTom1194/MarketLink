@@ -23,7 +23,24 @@ namespace MarketLink.Controllers
             if (farmerId == null) return Forbid();
             var searchPhone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
             ViewBag.Phone = searchPhone ?? string.Empty;
+            ViewBag.AutoAcceptEnabled = await _orderService.GetAutoAcceptEnabledAsync(farmerId.Value);
             return View(await _orderService.GetOrdersAsync(farmerId.Value, searchPhone));
+        }
+
+        // Only the signed-in farmer can change the switch for their active stall.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetAutoAccept(bool enabled)
+        {
+            var farmerId = CurrentUserId();
+            if (farmerId == null) return Forbid();
+
+            if (!await _orderService.SetAutoAcceptEnabledAsync(farmerId.Value, enabled))
+                TempData["Error"] = "No active stall was found for your account.";
+            else
+                TempData["Success"] = enabled ? "Automatic order acceptance is on for new orders." : "Automatic order acceptance is off.";
+
+            return RedirectToAction(nameof(Index));
         }
 
         public async Task<IActionResult> Details(int id)

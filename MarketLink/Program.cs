@@ -34,6 +34,7 @@ builder.Services.AddScoped<IFavoriteService, FavoriteService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IDisputeService, DisputeService>();
 builder.Services.AddHostedService<AutoCancelService>();
+builder.Services.AddHostedService<AutoAcceptOrderService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IFarmerAccountService, FarmerAccountService>();
 builder.Services.AddScoped<IFarmerProfileService, FarmerProfileService>();
