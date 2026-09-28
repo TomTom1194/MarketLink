@@ -1,5 +1,6 @@
 using System.Net;
 using MarketLink.Data;
+using MarketLink.Dtos;
 using MarketLink.Dtos.Admin;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,27 +27,17 @@ namespace MarketLink.Services.Admin
             _logger = logger;
         }
 
-        public async Task<List<FarmerRowDto>> GetFarmersAsync(string? status, string? search)
+        public Task<int> CountFarmersAsync(string? status, string? search)
         {
-            var query = _context.FarmerProfiles.AsQueryable();
+            return FilterFarmers(status, search).CountAsync();
+        }
 
-            if (!string.IsNullOrEmpty(status))
-            {
-                query = query.Where(f => f.ApprovalStatus == status);
-            }
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                string keyword = search.Trim();
-                query = query.Where(f =>
-                    f.BrandName.Contains(keyword) ||
-                    f.ContactPerson.Contains(keyword) ||
-                    f.User!.Email.Contains(keyword) ||
-                    f.User.Phone.Contains(keyword));
-            }
-
-            return await query
+        public async Task<List<FarmerRowDto>> GetFarmersAsync(string? status, string? search, PagerDto pager)
+        {
+            return await FilterFarmers(status, search)
                 .OrderByDescending(f => f.CreatedAt)
+                .Skip(pager.Skip())
+                .Take(pager.PageSize)
                 .Select(f => new FarmerRowDto
                 {
                     FarmerId = f.FarmerId,
@@ -84,6 +75,29 @@ namespace MarketLink.Services.Admin
                         .FirstOrDefault()
                 })
                 .ToListAsync();
+        }
+
+        // Farmers matching the status tab and the search box
+        private IQueryable<MarketLink.Models.FarmerProfile> FilterFarmers(string? status, string? search)
+        {
+            var query = _context.FarmerProfiles.AsQueryable();
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(f => f.ApprovalStatus == status);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                string keyword = search.Trim();
+                query = query.Where(f =>
+                    f.BrandName.Contains(keyword) ||
+                    f.ContactPerson.Contains(keyword) ||
+                    f.User!.Email.Contains(keyword) ||
+                    f.User.Phone.Contains(keyword));
+            }
+
+            return query;
         }
 
         public async Task<Dictionary<string, int>> CountByStatusAsync()

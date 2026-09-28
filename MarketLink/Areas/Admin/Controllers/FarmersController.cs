@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using MarketLink.Dtos;
 using MarketLink.Services.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,20 +11,25 @@ namespace MarketLink.Areas.Admin.Controllers
     public class FarmersController : Controller
     {
         private readonly IAdminFarmerService _farmerService;
+        private const int PageSize = 15;
 
         public FarmersController(IAdminFarmerService farmerService)
         {
             _farmerService = farmerService;
         }
 
-        // GET: /Admin/Farmers?status=pending&search=...
-        public async Task<IActionResult> Index(string? status, string? search)
+        // GET: /Admin/Farmers?status=pending&search=...&page=2
+        public async Task<IActionResult> Index(string? status, string? search, int page = 1)
         {
             ViewBag.Status = status;
             ViewBag.Search = search;
             ViewBag.Counts = await _farmerService.CountByStatusAsync();
 
-            var farmers = await _farmerService.GetFarmersAsync(status, search);
+            int total = await _farmerService.CountFarmersAsync(status, search);
+            var pager = PagerDto.Create(page, total, PageSize, "page", "");
+            ViewBag.Pager = pager;
+
+            var farmers = await _farmerService.GetFarmersAsync(status, search, pager);
             return View(farmers);
         }
 

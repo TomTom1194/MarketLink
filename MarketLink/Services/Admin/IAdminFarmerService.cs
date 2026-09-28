@@ -1,3 +1,4 @@
+using MarketLink.Dtos;
 using MarketLink.Dtos.Admin;
 
 namespace MarketLink.Services.Admin
@@ -5,7 +6,10 @@ namespace MarketLink.Services.Admin
     public interface IAdminFarmerService
     {
         // status: pending | approved | rejected | suspended, or null for all
-        Task<List<FarmerRowDto>> GetFarmersAsync(string? status, string? search);
+        Task<List<FarmerRowDto>> GetFarmersAsync(string? status, string? search, PagerDto pager);
+
+        // How many farmers match (for the page numbers)
+        Task<int> CountFarmersAsync(string? status, string? search);
 
         // e.g. { "pending": 3, "approved": 12 }
         Task<Dictionary<string, int>> CountByStatusAsync();
