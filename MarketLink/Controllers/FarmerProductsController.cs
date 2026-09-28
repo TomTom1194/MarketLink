@@ -235,7 +235,8 @@ namespace MarketLink.Controllers
                 TempData["Error"] = exception.Message;
                 return RedirectToAction(nameof(Reup), new { id = model.ProductId });
             }
-            return RedirectToAction(nameof(Edit), null, new { id = model.ProductId }, "stock");
+            // Back to the product list
+            return RedirectToAction(nameof(Index));
         }
 
         private int? GetFarmerId()
