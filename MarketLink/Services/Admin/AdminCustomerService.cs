@@ -1,4 +1,5 @@
 using MarketLink.Data;
+using MarketLink.Dtos;
 using MarketLink.Dtos.Admin;
 using MarketLink.Helpers;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,36 @@ namespace MarketLink.Services.Admin
             _logger = logger;
         }
 
-        public async Task<List<CustomerRowDto>> GetCustomersAsync(string? status, string? search)
+        public Task<int> CountCustomersAsync(string? status, string? search)
+        {
+            return FilterCustomers(status, search).CountAsync();
+        }
+
+        public async Task<List<CustomerRowDto>> GetCustomersAsync(string? status, string? search, PagerDto pager)
+        {
+            return await FilterCustomers(status, search)
+                .OrderByDescending(c => c.CreatedAt)
+                .Skip(pager.Skip())
+                .Take(pager.PageSize)
+                .Select(c => new CustomerRowDto
+                {
+                    UserId = c.CustomerId,
+                    FullName = c.FullName,
+                    Email = c.User!.Email,
+                    Phone = c.User.Phone,
+                    DistrictName = c.District!.DistrictName,
+                    CityName = c.District.City!.CityName,
+                    Status = c.User.Status,
+                    CreatedAt = c.CreatedAt,
+                    OrderCount = c.Orders.Count,
+                    WarningCount = _context.UserWarnings.Count(w => w.UserId == c.CustomerId),
+                    NoShowCount = c.Orders.Count(o => o.Status == "no_show")
+                })
+                .ToListAsync();
+        }
+
+        // Customers matching the status tab and the search box
+        private IQueryable<MarketLink.Models.CustomerProfile> FilterCustomers(string? status, string? search)
         {
             var query = _context.CustomerProfiles.AsQueryable();
 
@@ -38,23 +68,7 @@ namespace MarketLink.Services.Admin
                     c.User.Phone.Contains(keyword));
             }
 
-            return await query
-                .OrderByDescending(c => c.CreatedAt)
-                .Select(c => new CustomerRowDto
-                {
-                    UserId = c.CustomerId,
-                    FullName = c.FullName,
-                    Email = c.User!.Email,
-                    Phone = c.User.Phone,
-                    DistrictName = c.District!.DistrictName,
-                    CityName = c.District.City!.CityName,
-                    Status = c.User.Status,
-                    CreatedAt = c.CreatedAt,
-                    OrderCount = c.Orders.Count,
-                    WarningCount = _context.UserWarnings.Count(w => w.UserId == c.CustomerId),
-                    NoShowCount = c.Orders.Count(o => o.Status == "no_show")
-                })
-                .ToListAsync();
+            return query;
         }
 
         public async Task<bool> LockAsync(int userId)

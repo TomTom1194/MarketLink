@@ -100,6 +100,8 @@ else
                                 <form asp-action="Lock" asp-route-id="@customer.UserId" method="post"
                                       onsubmit="return confirm('Lock this account? The customer will not be able to log in.');">
                                     <input type="hidden" name="returnStatus" value="@status" />
+                                    <input type="hidden" name="returnSearch" value="@search" />
+                                    <input type="hidden" name="returnPage" value="@(((PagerDto)ViewBag.Pager).Page)" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Lock</button>
                                 </form>
                             }
@@ -107,6 +109,8 @@ else
                             {
                                 <form asp-action="Unlock" asp-route-id="@customer.UserId" method="post">
                                     <input type="hidden" name="returnStatus" value="@status" />
+                                    <input type="hidden" name="returnSearch" value="@search" />
+                                    <input type="hidden" name="returnPage" value="@(((PagerDto)ViewBag.Pager).Page)" />
                                     <button type="submit" class="btn btn-sm btn-outline-success">Unlock</button>
                                 </form>
                             }
@@ -117,4 +121,5 @@ else
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="(PagerDto)ViewBag.Pager" />
 }
