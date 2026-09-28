@@ -2,11 +2,19 @@
 @{
     ViewData["Title"] = "My orders";
     var orders = Model?.ToList() ?? new List<OrderDto>();
+    bool autoAcceptEnabled = ViewBag.AutoAcceptEnabled == true;
     string StatusLabel(string status) => status.ToLowerInvariant() switch { "placed" => "Waiting for confirmation", "accepted" => "Confirmed", "shipping" => "Shipping", "completed" => "Completed", "rejected" => "Rejected", "cancelled" => "Cancelled", "no_show" => "No-show", "disputed" => "Under review", _ => status };
     string StatusClass(string status) => status.ToLowerInvariant() switch { "placed" => "pending", "accepted" => "accepted", "completed" => "completed", "rejected" or "cancelled" => "cancelled", _ => "shipping" };
 }
 <section class="farmer-page">
     <div class="page-heading"><div><span class="eyebrow">SALES MANAGEMENT</span><h1>My orders</h1><p>Track and handle orders from your customers.</p></div><span class="heading-count">@orders.Count @(orders.Count == 1 ? "order" : "orders")</span></div>
+    <form asp-controller="Orders" asp-action="SetAutoAccept" method="post" class="card border-0 shadow-sm p-3 mb-3">
+        @Html.AntiForgeryToken()
+        <div class="d-flex justify-content-between align-items-center gap-3">
+            <div><label class="fw-semibold" for="autoAcceptSwitch">Automatically accept orders</label><div class="small text-muted">New orders are accepted after 5 minutes when enough stock is available.</div></div>
+            <div class="form-check form-switch fs-4 m-0"><input class="form-check-input" type="checkbox" role="switch" id="autoAcceptSwitch" name="enabled" value="true" checked="@autoAcceptEnabled" onchange="this.form.submit()" /><input type="hidden" name="enabled" value="false" /></div>
+        </div>
+    </form>
     <form class="order-search" asp-controller="Orders" asp-action="Index" method="get"><label for="phone-search">Search by phone number</label><div class="order-search-controls"><span class="search-icon">⌕</span><input id="phone-search" name="phone" type="tel" value="@ViewBag.Phone" placeholder="Last 3–4 digits or the full phone number" autocomplete="off"/><button type="submit">Find orders</button>@if (!string.IsNullOrWhiteSpace((string?)ViewBag.Phone)) { <a asp-action="Index">Clear filter</a> }</div></form>
     <div class="order-tabs" role="tablist"><button class="order-tab active" data-filter="all">All <span>@orders.Count</span></button><button class="order-tab" data-filter="placed">Waiting for confirmation</button><button class="order-tab" data-filter="accepted">Confirmed</button><button class="order-tab" data-filter="completed">Completed</button><button class="order-tab" data-filter="rejected">Rejected</button><button class="order-tab" data-filter="cancelled">Cancelled</button><button class="order-tab" data-filter="disputed">Under review</button><button class="order-tab" data-filter="no_show">No-show</button></div>
     <div class="orders-list">
