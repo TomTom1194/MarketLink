@@ -34,12 +34,35 @@ namespace MarketLink.Services
                 },
                 generationConfig = new
                 {
-                    responseMimeType = "application/json",   // ask Gemini to answer with JSON only
+                    responseMimeType = "application/json",   
                     maxOutputTokens = 1024
                 }
             };
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "v1beta/models/" + _settings.Model + ":generateContent");
+            
+            var models = new List<string> { _settings.Model };
+            if (!string.IsNullOrWhiteSpace(_settings.FallbackModel) && _settings.FallbackModel != _settings.Model)
+            {
+                models.Add(_settings.FallbackModel);
+            }
+
+            var result = new ProductNameCheckResult { Matches = null, Reason = "The AI check is not available right now." };
+            foreach (string model in models)
+            {
+                result = await AskModelAsync(model, body);
+                if (result.Matches != null)
+                {
+                    return result;   
+                }
+            }
+            return result;   
+        }
+
+        // Sends the question to one Gemini model.
+        // Matches = null when this model could not answer (error, timeout, unreadable answer).
+        private async Task<ProductNameCheckResult> AskModelAsync(string model, object body)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "v1beta/models/" + model + ":generateContent");
             request.Headers.Add("x-goog-api-key", _settings.ApiKey);
             request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
@@ -49,7 +72,7 @@ namespace MarketLink.Services
                 string json = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Gemini API returned {Status}: {Body}", (int)response.StatusCode, json);
+                    _logger.LogWarning("Gemini model {Model} returned {Status}: {Body}", model, (int)response.StatusCode, json);
                     return new ProductNameCheckResult { Matches = null, Reason = $"The AI check is not available right now (Gemini error {(int)response.StatusCode})." };
                 }
 
@@ -64,7 +87,7 @@ namespace MarketLink.Services
             }
             catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException || ex is JsonException || ex is KeyNotFoundException || ex is InvalidOperationException || ex is IndexOutOfRangeException)
             {
-                _logger.LogWarning(ex, "Could not check product name with Gemini");
+                _logger.LogWarning(ex, "Could not check product name with Gemini model {Model}", model);
                 return new ProductNameCheckResult { Matches = null, Reason = $"The AI check is not available right now ({ex.GetType().Name})." };
             }
         }
