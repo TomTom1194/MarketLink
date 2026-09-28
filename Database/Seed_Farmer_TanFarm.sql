@@ -49,6 +49,14 @@ IF NOT EXISTS (SELECT 1 FROM Stalls WHERE farmer_id = @userId)
     INSERT INTO Stalls (market_id, farmer_id, stall_code, location_note, selling_days, is_active)
     VALUES (@marketId, @userId, N'TAN-01', N'Test stall', @openDays, 1);
 
+/* 4) Categories Tan Farm may sell: all active ones (needs Update_07_farmer_category.sql) */
+IF OBJECT_ID(N'dbo.Farmer_Category', N'U') IS NOT NULL
+    INSERT INTO Farmer_Category (farmer_id, category_id)
+    SELECT @userId, c.category_id
+    FROM Product_Category c
+    WHERE c.is_active = 1
+      AND NOT EXISTS (SELECT 1 FROM Farmer_Category fc WHERE fc.farmer_id = @userId AND fc.category_id = c.category_id);
+
 COMMIT;
 GO
 

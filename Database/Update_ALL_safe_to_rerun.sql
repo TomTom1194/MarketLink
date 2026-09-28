@@ -50,6 +50,31 @@ FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM dbo.Product_Unit AS existing WHERE existing.unit = source.unit);
 GO
 
+-- Update_07: categories each farmer is allowed to sell
+IF OBJECT_ID(N'dbo.Farmer_Category', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Farmer_Category (
+        farmer_id    INT NOT NULL REFERENCES Farmer_Profile(farmer_id),
+        category_id  INT NOT NULL REFERENCES Product_Category(category_id),
+        PRIMARY KEY (farmer_id, category_id)
+    );
+
+    -- Farmers that already exist: allow the categories of the products they already sell,
+    -- or every active category if they have no product yet (so nobody is locked out).
+    INSERT INTO dbo.Farmer_Category (farmer_id, category_id)
+    SELECT DISTINCT p.farmer_id, p.category_id
+    FROM Products p
+    WHERE p.status <> 'removed';
+
+    INSERT INTO dbo.Farmer_Category (farmer_id, category_id)
+    SELECT f.farmer_id, c.category_id
+    FROM Farmer_Profile f
+    CROSS JOIN Product_Category c
+    WHERE c.is_active = 1
+      AND NOT EXISTS (SELECT 1 FROM dbo.Farmer_Category fc WHERE fc.farmer_id = f.farmer_id);
+END;
+GO
+
 -- Check: every column the code needs should be listed here
 SELECT TABLE_NAME, COLUMN_NAME
 FROM INFORMATION_SCHEMA.COLUMNS

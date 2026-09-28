@@ -63,5 +63,8 @@ namespace MarketLink.Models
         public List<Stall> Stalls { get; set; } = new List<Stall>();
 
         public List<Product> Products { get; set; } = new List<Product>();
+
+        // Categories this farmer is allowed to sell
+        public List<FarmerCategory> Categories { get; set; } = new List<FarmerCategory>();
     }
 }

@@ -11,8 +11,8 @@ namespace MarketLink.Services.Admin
         private readonly MarketLinkDbContext _context;
         private readonly IWebHostEnvironment _environment;
 
-        // Photos are saved in wwwroot/uploads/markets
-        private const string ImageFolder = "uploads/markets";
+        // Photos are saved in wwwroot/images/markets
+        private const string ImageFolder = "images/markets";
         private const long MaxImageSize = 5 * 1024 * 1024;   // 5 MB
         private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
 
@@ -194,7 +194,7 @@ namespace MarketLink.Services.Admin
                 .ToListAsync();
         }
 
-        // Saves the file with a random name and returns its web path, e.g. /uploads/markets/3f2a....jpg
+        // Saves the file with a random name and returns its web path, e.g. /images/markets/3f2a....jpg
         private async Task<string> SaveImageAsync(IFormFile file)
         {
             string folder = Path.Combine(_environment.WebRootPath, ImageFolder);

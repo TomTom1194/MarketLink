@@ -49,6 +49,9 @@ namespace MarketLink.Dtos
         [Display(Name = "What do you grow or sell?")]
         public string? Description { get; set; }
 
+        // Product categories the farmer will sell (ticked boxes). Products can only be posted in these.
+        public List<int> CategoryIds { get; set; } = new List<int>();
+
         // ===== 2. Where do you sell? =====
 
         // A market id, or OtherMarket (0) when the market is not in the list

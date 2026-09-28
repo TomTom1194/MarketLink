@@ -33,8 +33,9 @@ namespace MarketLink.Controllers
         [HttpGet]
         public async Task<IActionResult> Create()
         {
-            if (GetFarmerId() == null) return Challenge();
-            await LoadOptionsAsync();
+            var farmerId = GetFarmerId();
+            if (farmerId == null) return Challenge();
+            await LoadOptionsAsync(farmerId.Value);
             return View(new CreateFarmerProductDto());
         }
 
@@ -56,7 +57,7 @@ namespace MarketLink.Controllers
                 catch (ValidationException exception) { ModelState.AddModelError(nameof(model.ProductName), exception.Message); }
                 catch (InvalidOperationException exception) { ModelState.AddModelError("", exception.Message); }
             }
-            await LoadOptionsAsync(model.CategoryId, model.ExpId, model.Unit);
+            await LoadOptionsAsync(farmerId.Value, model.CategoryId, model.ExpId, model.Unit);
             return View(model);
         }
 
@@ -77,7 +78,7 @@ namespace MarketLink.Controllers
                 Price = product.StockPrices.FirstOrDefault(sp => sp.EffectiveTo == null)?.Price
             };
             ViewBag.CurrentImageUrl = product.ImageUrl;
-            await LoadOptionsAsync(product.CategoryId, null, product.Unit);
+            await LoadOptionsAsync(farmerId.Value, product.CategoryId, null, product.Unit);
             await LoadPriceStockAsync(farmerId.Value, product);
             return View(model);
         }
@@ -111,7 +112,7 @@ namespace MarketLink.Controllers
                 catch (InvalidOperationException exception) { ModelState.AddModelError("", exception.Message); }
             }
             ViewBag.CurrentImageUrl = product.ImageUrl;
-            await LoadOptionsAsync(model.CategoryId, null, model.Unit);
+            await LoadOptionsAsync(farmerId.Value, model.CategoryId, null, model.Unit);
             await LoadPriceStockAsync(farmerId.Value, product);
             return View(model);
         }
@@ -243,9 +244,10 @@ namespace MarketLink.Controllers
             ViewBag.ExpiryOptions = await GetExpirySelectAsync(product.ExpId);
         }
 
-        private async Task LoadOptionsAsync(int? categoryId = null, int? expId = null, string? unit = null)
+        private async Task LoadOptionsAsync(int farmerId, int? categoryId = null, int? expId = null, string? unit = null)
         {
-            ViewBag.Categories = new SelectList(await _products.GetCategoriesAsync(), "CategoryId", "CategoryName", categoryId);
+            // Only the categories this farmer registered for
+            ViewBag.Categories = new SelectList(await _products.GetCategoriesAsync(farmerId, categoryId), "CategoryId", "CategoryName", categoryId);
             ViewBag.ExpiryOptions = await GetExpirySelectAsync(expId);
             ViewBag.Units = new SelectList(await _products.GetUnitsAsync(), unit);
         }

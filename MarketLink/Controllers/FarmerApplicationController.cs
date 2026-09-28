@@ -70,6 +70,9 @@ namespace MarketLink.Controllers
 
         private async Task LoadDropdowns(FarmerApplicationDto model)
         {
+            // Product categories for the "What do you sell?" check boxes
+            ViewBag.ProductCategories = await _farmerAccountService.GetActiveCategoriesAsync();
+
             var cities = await _farmerAccountService.GetCitiesAsync();
             ViewBag.Cities = new SelectList(cities, "CityId", "CityName", model.CityId);
 

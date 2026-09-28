@@ -14,6 +14,9 @@ namespace MarketLink.Services
 
         Task<List<City>> GetCitiesAsync();
 
+        // Product categories shown as check boxes on the application form
+        Task<List<ProductCategory>> GetActiveCategoriesAsync();
+
         Task<List<District>> GetDistrictsAsync(int cityId);
 
         // All active markets, with district and city (for the market dropdown)
