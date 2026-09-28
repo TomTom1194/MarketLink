@@ -6,6 +6,7 @@
     string? status = ViewBag.Status;
     string? search = ViewBag.Search;
     var counts = (Dictionary<string, int>)ViewBag.Counts;
+    int maxWarnings = MarketLink.Services.DisputeService.MaxWarnings;
     int total = counts.Values.Sum();
 
     // Tabs: (value in database, label)
@@ -46,6 +47,10 @@
 }
 else
 {
+    <div class="risk-legend">
+        <span><span class="risk-dot risk-dot-high"></span>1 more warning locks the account</span>
+        <span><span class="risk-dot risk-dot-low"></span>Has a warning</span>
+    </div>
     <div class="admin-table">
         <table class="table">
             <thead>
@@ -54,6 +59,7 @@ else
                 <th>Contact</th>
                 <th>Market &amp; stall</th>
                 <th>Applied</th>
+                <th class="num">Warnings</th>
                 <th>Status</th>
                 <th class="text-end">Action</th>
             </tr>
@@ -61,7 +67,14 @@ else
             <tbody>
             @foreach (var farmer in Model)
             {
-                <tr>
+                // Highlight farmers with warnings (only while they can still sell)
+                string risk = "";
+                if (farmer.ApprovalStatus == "approved")
+                {
+                    if (farmer.WarningCount >= maxWarnings - 1) risk = "risk-high";
+                    else if (farmer.WarningCount > 0) risk = "risk-low";
+                }
+                <tr class="@risk">
                     <td class="fw-semibold">@farmer.BrandName</td>
                     <td>
                         @farmer.ContactPerson<br />
@@ -84,6 +97,16 @@ else
                         }
                     </td>
                     <td class="text-nowrap">@farmer.CreatedAt.ToString("dd/MM/yyyy")</td>
+                    <td class="num">
+                        @if (farmer.WarningCount > 0)
+                        {
+                            <span class="warn-count @(farmer.WarningCount >= maxWarnings - 1 ? "warn-high" : "")">@farmer.WarningCount/@maxWarnings</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">0</span>
+                        }
+                    </td>
                     <td><span class="status-pill status-@farmer.ApprovalStatus">@farmer.ApprovalStatus</span></td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-outline-success" asp-action="Detail" asp-route-id="@farmer.FarmerId">View</a>

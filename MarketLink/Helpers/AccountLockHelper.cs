@@ -20,5 +20,21 @@ namespace MarketLink.Helpers
   <p>MarketLink</p>
 </div>";
         }
+
+        public const string UnlockSubject = "Your MarketLink account has been unlocked";
+
+        public static string BuildUnlockEmail(string name, string loginUrl)
+        {
+            string safeName = WebUtility.HtmlEncode(name);
+            string safeUrl = WebUtility.HtmlEncode(loginUrl);
+
+            return $@"
+<div style=""font-family:Arial,sans-serif;font-size:15px;color:#1d2620;line-height:1.6"">
+  <p>Hello {safeName},</p>
+  <p>Your MarketLink account has been <strong>unlocked</strong>. You can log in again with your old password.</p>
+  <p><a href=""{safeUrl}"">{safeUrl}</a></p>
+  <p>MarketLink</p>
+</div>";
+        }
     }
 }

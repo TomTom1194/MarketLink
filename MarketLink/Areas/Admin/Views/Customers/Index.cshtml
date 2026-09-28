@@ -5,6 +5,7 @@
 
     string? status = ViewBag.Status;
     string? search = ViewBag.Search;
+    int maxWarnings = MarketLink.Services.DisputeService.MaxWarnings;
 
     var tabs = new List<(string? Value, string Label)>
     {
@@ -38,6 +39,10 @@
 }
 else
 {
+    <div class="risk-legend">
+        <span><span class="risk-dot risk-dot-high"></span>1 more warning locks the account</span>
+        <span><span class="risk-dot risk-dot-low"></span>Has a warning or a no-show order</span>
+    </div>
     <div class="admin-table">
         <table class="table">
             <thead>
@@ -47,6 +52,8 @@ else
                 <th>Area</th>
                 <th>Joined</th>
                 <th class="num">Orders</th>
+                <th class="num">No-shows</th>
+                <th class="num">Warnings</th>
                 <th>Status</th>
                 <th class="text-end">Actions</th>
             </tr>
@@ -54,7 +61,14 @@ else
             <tbody>
             @foreach (var customer in Model)
             {
-                <tr>
+                // Highlight customers who do not pick up their orders (only while the account is still active)
+                string risk = "";
+                if (customer.Status == "active")
+                {
+                    if (customer.WarningCount >= maxWarnings - 1) risk = "risk-high";
+                    else if (customer.WarningCount > 0 || customer.NoShowCount > 0) risk = "risk-low";
+                }
+                <tr class="@risk">
                     <td class="fw-semibold">@customer.FullName</td>
                     <td>
                         @customer.Phone<br />
@@ -63,6 +77,17 @@ else
                     <td>@customer.DistrictName, @customer.CityName</td>
                     <td class="text-nowrap">@customer.CreatedAt.ToString("dd/MM/yyyy")</td>
                     <td class="num">@customer.OrderCount</td>
+                    <td class="num">@(customer.NoShowCount > 0 ? customer.NoShowCount.ToString() : "–")</td>
+                    <td class="num">
+                        @if (customer.WarningCount > 0)
+                        {
+                            <span class="warn-count @(customer.WarningCount >= maxWarnings - 1 ? "warn-high" : "")">@customer.WarningCount/@maxWarnings</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">0</span>
+                        }
+                    </td>
                     <td>
                         <span class="status-pill status-@customer.Status">
                             @(customer.Status == "active" ? "Active" : "Locked")

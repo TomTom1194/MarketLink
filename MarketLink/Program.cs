@@ -1,4 +1,5 @@
 using MarketLink.Data;
+using MarketLink.Models;
 using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
@@ -39,12 +40,22 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IFarmerAccountService, FarmerAccountService>();
 builder.Services.AddScoped<IFarmerProfileService, FarmerProfileService>();
 builder.Services.AddScoped<IFarmerStallManagementService, FarmerStallManagementService>();
+builder.Services.AddScoped<IProductUnitService, ProductUnitService>();
 builder.Services.AddScoped<IFarmerProductService, FarmerProductService>();
 builder.Services.AddScoped<IFarmerDashboardService, FarmerDashboardService>();
 
 // Email (settings in appsettings.json -> "EmailSettings")
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddScoped<IEmailService, EmailService>();
+
+// AI check of product names typed by hand (Google Gemini, free key from AI Studio).
+// The key lives in user-secrets, never in appsettings.json.
+builder.Services.Configure<GeminiSettings>(builder.Configuration.GetSection("Gemini"));
+builder.Services.AddHttpClient<IProductNameChecker, GeminiProductNameChecker>(client =>
+{
+    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 
 // Admin portal
 builder.Services.AddScoped<IAdminReportService, AdminReportService>();
@@ -53,6 +64,7 @@ builder.Services.AddScoped<IAdminFarmerService, AdminFarmerService>();
 builder.Services.AddScoped<IAdminCustomerService, AdminCustomerService>();
 builder.Services.AddScoped<IAdminCategoryService, AdminCategoryService>();
 builder.Services.AddScoped<IAdminProductExpService, AdminProductExpService>();
+builder.Services.AddScoped<IAdminProductTemplateService, AdminProductTemplateService>();
 
 // Cookie-based login
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

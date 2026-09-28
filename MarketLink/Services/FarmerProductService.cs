@@ -12,6 +12,7 @@ namespace MarketLink.Services
     {
         private readonly MarketLinkDbContext _context;
         private readonly IWebHostEnvironment _environment;
+        private readonly IProductUnitService _units;
 
         private const long MaxImageSize = 5 * 1024 * 1024;
 
@@ -25,10 +26,12 @@ namespace MarketLink.Services
 
         public FarmerProductService(
             MarketLinkDbContext context,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IProductUnitService units)
         {
             _context = context;
             _environment = environment;
+            _units = units;
         }
 
         // Categories this farmer ticked on the application form (only active ones) - used by the product form.
@@ -43,19 +46,28 @@ namespace MarketLink.Services
                 .ToListAsync();
         }
 
+        // Ready-made products (Product_Template) in the categories this farmer registered for
+        public async Task<List<ProductTemplate>> GetTemplatesAsync(int farmerId)
+        {
+            return await _context.ProductTemplates
+                .Include(t => t.Category)
+                .Where(t => t.IsActive && t.Category!.IsActive
+                    && _context.FarmerCategories.Any(fc => fc.FarmerId == farmerId && fc.CategoryId == t.CategoryId))
+                .OrderBy(t => t.Category!.CategoryName)
+                .ThenBy(t => t.ProductName)
+                .ToListAsync();
+        }
+
+        public async Task<ProductTemplate?> GetTemplateAsync(int farmerId, int templateId)
+        {
+            return (await GetTemplatesAsync(farmerId)).FirstOrDefault(t => t.TemplateId == templateId);
+        }
+
         // Is the farmer allowed to post in this category?
         private Task<bool> FarmerSellsCategoryAsync(int farmerId, int categoryId)
         {
             return _context.FarmerCategories.AnyAsync(fc =>
                 fc.FarmerId == farmerId && fc.CategoryId == categoryId && fc.Category!.IsActive);
-        }
-
-        // The list of units is kept in the Product_Unit table in SQL Server.
-        public Task<List<string>> GetUnitsAsync()
-        {
-            return _context.Database.SqlQueryRaw<string>(
-                "SELECT [unit] AS [Value] FROM [dbo].[Product_Unit] WHERE [is_active] = 1 ORDER BY [sort_order]")
-                .ToListAsync();
         }
 
         // Load the valid display periods from Product_Exp.
@@ -142,8 +154,9 @@ namespace MarketLink.Services
                 throw new InvalidOperationException("You can only post products in the categories you registered for.");
             }
 
-            if (!(await GetUnitsAsync()).Contains(model.Unit.Trim()))
-                throw new InvalidOperationException("The selected unit does not exist or is inactive.");
+            // The unit must be one of the units allowed in this category (Category_Unit)
+            if (!await _units.IsAllowedAsync(model.CategoryId, model.Unit))
+                throw new InvalidOperationException("This unit cannot be used for products in this category.");
 
             var normalizedName = model.ProductName.Trim().ToUpperInvariant();
             var nameExists = await _context.Products.AnyAsync(item => item.FarmerId == farmerId && item.Status != "removed" && item.ProductName.Trim().ToUpper() == normalizedName);
@@ -209,8 +222,10 @@ namespace MarketLink.Services
                 throw new InvalidOperationException("You can only post products in the categories you registered for.");
             }
 
-            if (!(await GetUnitsAsync()).Contains(model.Unit.Trim()))
-                throw new InvalidOperationException("The selected unit does not exist or is inactive.");
+            // The unit must fit the category. An old product may keep its unit while the category stays the same.
+            bool keepsOldUnit = model.Unit.Trim() == product.Unit && model.CategoryId == product.CategoryId;
+            if (!keepsOldUnit && !await _units.IsAllowedAsync(model.CategoryId, model.Unit))
+                throw new InvalidOperationException("This unit cannot be used for products in this category.");
 
             var normalizedName = model.ProductName.Trim().ToUpperInvariant();
             var nameExists = await _context.Products.AnyAsync(item => item.FarmerId == farmerId && item.ProductId != model.ProductId && item.Status != "removed" && item.ProductName.Trim().ToUpper() == normalizedName);

@@ -15,5 +15,11 @@ namespace MarketLink.Dtos.Admin
 
         public DateTime CreatedAt { get; set; }
         public int OrderCount { get; set; }
+
+        // Warnings from pickup reports (DisputeService.MaxWarnings warnings lock the account)
+        public int WarningCount { get; set; }
+
+        // Orders the customer did not pick up (status = no_show)
+        public int NoShowCount { get; set; }
     }
 }

@@ -171,6 +171,17 @@
                     <p class="small text-muted">by @Model.ApprovedByEmail</p>
                 }
                 <p class="small text-muted">@Model.ProductCount product(s) posted.</p>
+                @if (Model.WarningCount > 0)
+                {
+                    int maxWarnings = MarketLink.Services.DisputeService.MaxWarnings;
+                    <p class="small mb-2">
+                        <span class="warn-count @(Model.WarningCount >= maxWarnings - 1 ? "warn-high" : "")">Warnings @Model.WarningCount/@maxWarnings</span>
+                        @if (Model.WarningCount >= maxWarnings - 1)
+                        {
+                            <span class="text-danger ms-1">1 more locks the account</span>
+                        }
+                    </p>
+                }
                 <form asp-action="Suspend" asp-route-id="@Model.FarmerId" method="post"
                       onsubmit="return confirm('Suspend this farmer? They will not be able to sell.');">
                     <button type="submit" class="btn btn-outline-danger w-100">Suspend</button>

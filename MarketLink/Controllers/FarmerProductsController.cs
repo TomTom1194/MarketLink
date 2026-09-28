@@ -15,11 +15,16 @@ namespace MarketLink.Controllers
     {
         private readonly IFarmerProductService _products;
         private readonly IFarmerStallManagementService _stalls;
+        private readonly IProductNameChecker _nameChecker;
+        private readonly IProductUnitService _units;
 
-        public FarmerProductsController(IFarmerProductService products, IFarmerStallManagementService stalls)
+        public FarmerProductsController(IFarmerProductService products, IFarmerStallManagementService stalls,
+            IProductNameChecker nameChecker, IProductUnitService units)
         {
             _products = products;
             _stalls = stalls;
+            _nameChecker = nameChecker;
+            _units = units;
         }
 
         [HttpGet]
@@ -44,14 +49,47 @@ namespace MarketLink.Controllers
         {
             var farmerId = GetFarmerId();
             if (farmerId == null) return Challenge();
-            if (ModelState.IsValid && !(await _products.GetUnitsAsync()).Contains(model.Unit.Trim()))
-                ModelState.AddModelError(nameof(model.Unit), "The selected unit does not exist or is inactive.");
+
+            // 1) Picked a template: name, category and unit come from the template (always a match)
+            if (model.TemplateId != null)
+            {
+                var template = await _products.GetTemplateAsync(farmerId.Value, model.TemplateId.Value);
+                if (template == null)
+                {
+                    ModelState.AddModelError(nameof(model.TemplateId), "This product template is not available for your categories.");
+                }
+                else
+                {
+                    model.ProductName = template.ProductName;
+                    model.CategoryId = template.CategoryId;
+                    model.Unit = template.Unit;
+                    ModelState.Remove(nameof(model.ProductName));
+                    ModelState.Remove(nameof(model.CategoryId));
+                    ModelState.Remove(nameof(model.Unit));
+                }
+            }
+
+            // The unit must be one of the units allowed in the chosen category
+            if (ModelState.IsValid && !await _units.IsAllowedAsync(model.CategoryId, model.Unit))
+                ModelState.AddModelError(nameof(model.Unit), "This unit cannot be used for products in this category.");
+
+            // 2) Typed by hand: ask AI whether the name and unit fit the category. If not, nothing is saved.
+            string aiNote = "";
+            if (ModelState.IsValid && model.TemplateId == null)
+            {
+                var check = await CheckNameWithAiAsync(farmerId.Value, model.ProductName, model.CategoryId, model.Unit);
+                if (check.Matches == false)
+                    ModelState.AddModelError(nameof(model.ProductName), check.Reason);
+                else if (check.Matches == null)
+                    aiNote = " (The AI name check was skipped: " + check.Reason + ")";
+            }
+
             if (ModelState.IsValid)
             {
                 try
                 {
                     var product = await _products.CreateProductAsync(farmerId.Value, model);
-                    TempData["Success"] = "Product added. Enter its price and quantity to start selling.";
+                    TempData["Success"] = "Product added. Enter its price and quantity to start selling." + aiNote;
                     return RedirectToAction(nameof(Edit), null, new { id = product.ProductId }, "stock");
                 }
                 catch (ValidationException exception) { ModelState.AddModelError(nameof(model.ProductName), exception.Message); }
@@ -78,7 +116,7 @@ namespace MarketLink.Controllers
                 Price = product.StockPrices.FirstOrDefault(sp => sp.EffectiveTo == null)?.Price
             };
             ViewBag.CurrentImageUrl = product.ImageUrl;
-            await LoadOptionsAsync(farmerId.Value, product.CategoryId, null, product.Unit);
+            await LoadOptionsAsync(farmerId.Value, product.CategoryId, null, product.Unit, product);
             await LoadPriceStockAsync(farmerId.Value, product);
             return View(model);
         }
@@ -90,8 +128,22 @@ namespace MarketLink.Controllers
             if (farmerId == null) return Challenge();
             var product = await _products.GetProductAsync(farmerId.Value, model.ProductId);
             if (product == null) return NotFound();
-            if (ModelState.IsValid && !(await _products.GetUnitsAsync()).Contains(model.Unit.Trim()))
-                ModelState.AddModelError(nameof(model.Unit), "The selected unit does not exist or is inactive.");
+            // The unit must fit the category. An old product may keep its unit while the category stays the same.
+            bool keepsOldUnit = (model.Unit ?? "").Trim() == product.Unit && model.CategoryId == product.CategoryId;
+            if (ModelState.IsValid && !keepsOldUnit && !await _units.IsAllowedAsync(model.CategoryId, model.Unit))
+                ModelState.AddModelError(nameof(model.Unit), "This unit cannot be used for products in this category.");
+
+            // Name, category or unit changed: ask AI again whether they fit. If not, nothing is saved.
+            bool detailsChanged = model.ProductName.Trim() != product.ProductName
+                || model.CategoryId != product.CategoryId
+                || (model.Unit ?? "").Trim() != product.Unit;
+            if (ModelState.IsValid && detailsChanged)
+            {
+                var check = await CheckNameWithAiAsync(farmerId.Value, model.ProductName, model.CategoryId, model.Unit);
+                if (check.Matches == false)
+                    ModelState.AddModelError(nameof(model.ProductName), check.Reason);
+            }
+
             if (ModelState.IsValid)
             {
                 try
@@ -112,7 +164,7 @@ namespace MarketLink.Controllers
                 catch (InvalidOperationException exception) { ModelState.AddModelError("", exception.Message); }
             }
             ViewBag.CurrentImageUrl = product.ImageUrl;
-            await LoadOptionsAsync(farmerId.Value, model.CategoryId, null, model.Unit);
+            await LoadOptionsAsync(farmerId.Value, model.CategoryId, null, model.Unit, product);
             await LoadPriceStockAsync(farmerId.Value, product);
             return View(model);
         }
@@ -235,6 +287,24 @@ namespace MarketLink.Controllers
             }
         }
 
+        // Ask Gemini whether a product name typed by hand (and its unit) fits the chosen category
+        private async Task<ProductNameCheckResult> CheckNameWithAiAsync(int farmerId, string productName, int categoryId, string unit)
+        {
+            var category = (await _products.GetCategoriesAsync(farmerId, categoryId)).FirstOrDefault(c => c.CategoryId == categoryId);
+            if (category == null)
+            {
+                return new ProductNameCheckResult { Matches = null, Reason = "unknown category" };
+            }
+
+            var result = await _nameChecker.CheckAsync(productName.Trim(), category.CategoryName, unit.Trim());
+            if (result.Matches == false)
+            {
+                result.Reason = $"\"{productName.Trim()}\" sold per {unit.Trim()} does not fit {category.CategoryName}. {result.Reason} " +
+                                "Please pick a product from the templates, or change the category or unit.";
+            }
+            return result;
+        }
+
         // Data for the "Price & stock" section of the Edit page
         private async Task LoadPriceStockAsync(int farmerId, Product product)
         {
@@ -244,12 +314,27 @@ namespace MarketLink.Controllers
             ViewBag.ExpiryOptions = await GetExpirySelectAsync(product.ExpId);
         }
 
-        private async Task LoadOptionsAsync(int farmerId, int? categoryId = null, int? expId = null, string? unit = null)
+        // editing: the product being edited (its current unit stays selectable in its current category)
+        private async Task LoadOptionsAsync(int farmerId, int? categoryId = null, int? expId = null, string? unit = null, Product? editing = null)
         {
             // Only the categories this farmer registered for
-            ViewBag.Categories = new SelectList(await _products.GetCategoriesAsync(farmerId, categoryId), "CategoryId", "CategoryName", categoryId);
+            var categories = await _products.GetCategoriesAsync(farmerId, editing?.CategoryId ?? categoryId);
+            ViewBag.Categories = new SelectList(categories, "CategoryId", "CategoryName", categoryId);
             ViewBag.ExpiryOptions = await GetExpirySelectAsync(expId);
-            ViewBag.Units = new SelectList(await _products.GetUnitsAsync(), unit);
+            ViewBag.Templates = await _products.GetTemplatesAsync(farmerId);
+
+            // Units allowed in each category: { categoryId: [units] }. The page script swaps the unit list when the category changes.
+            var unitsByCategory = await _units.GetUnitsByCategoryAsync(categories.Select(c => c.CategoryId));
+            if (editing != null && unitsByCategory.TryGetValue(editing.CategoryId, out var oldCategoryUnits)
+                && !oldCategoryUnits.Contains(editing.Unit))
+            {
+                oldCategoryUnits.Add(editing.Unit);
+            }
+            ViewBag.UnitsByCategory = unitsByCategory;
+
+            // Units of the selected category (empty until a category is chosen)
+            var units = categoryId != null && unitsByCategory.TryGetValue(categoryId.Value, out var list) ? list : new List<string>();
+            ViewBag.Units = new SelectList(units, unit);
         }
 
         private async Task<SelectList> GetExpirySelectAsync(int? selectedId)

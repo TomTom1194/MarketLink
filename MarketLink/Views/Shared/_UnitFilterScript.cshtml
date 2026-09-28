@@ -1,0 +1,26 @@
+@* Unit dropdown that follows the category dropdown.
+   Needs: <select id="CategoryId"> and <select id="Unit">, and ViewBag.UnitsByCategory = { categoryId: [units] }.
+   Other scripts can call refreshUnits() after they change the category by code. *@
+@{
+    var unitsByCategory = ViewBag.UnitsByCategory as Dictionary<int, List<string>> ?? new Dictionary<int, List<string>>();
+}
+<script>
+    const unitsByCategory = @Json.Serialize(unitsByCategory);
+
+    function refreshUnits() {
+        const categorySelect = document.getElementById('CategoryId');
+        const unitSelect = document.getElementById('Unit');
+        const selected = unitSelect.value;
+        const units = unitsByCategory[categorySelect.value] || [];
+
+        unitSelect.innerHTML = '';
+        unitSelect.add(new Option(units.length ? '-- Select unit --' : '-- Select a category first --', ''));
+        units.forEach(unit => unitSelect.add(new Option(unit, unit)));
+
+        // Keep the chosen unit if the new category allows it
+        unitSelect.value = units.includes(selected) ? selected : '';
+    }
+
+    document.getElementById('CategoryId').addEventListener('change', refreshUnits);
+    refreshUnits();
+</script>

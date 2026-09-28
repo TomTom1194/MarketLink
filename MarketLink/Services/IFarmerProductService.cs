@@ -7,7 +7,9 @@ namespace MarketLink.Services
     {
         Task<List<ProductCategory>> GetCategoriesAsync(int farmerId, int? keepCategoryId = null);
 
-        Task<List<string>> GetUnitsAsync();
+        // Ready-made products in the categories this farmer registered for
+        Task<List<ProductTemplate>> GetTemplatesAsync(int farmerId);
+        Task<ProductTemplate?> GetTemplateAsync(int farmerId, int templateId);
 
         Task<List<ProductExp>> GetExpiryOptionsAsync();
 

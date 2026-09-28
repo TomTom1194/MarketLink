@@ -56,7 +56,7 @@ namespace MarketLink.Areas.Admin.Controllers
             }
             else if (result.Reactivated)
             {
-                TempData["Success"] = "The farmer was reactivated and can sell again with their old password.";
+                TempData["Success"] = "The farmer was reactivated, can sell again with their old password, and was notified by email.";
             }
             else if (result.EmailSent)
             {
@@ -89,7 +89,7 @@ namespace MarketLink.Areas.Admin.Controllers
         public async Task<IActionResult> Suspend(int id)
         {
             if (await _farmerService.SuspendAsync(id))
-                TempData["Success"] = "The farmer was suspended and can no longer sell.";
+                TempData["Success"] = "The farmer was suspended, can no longer sell, and was notified by email.";
             else
                 TempData["Error"] = "Only approved farmers can be suspended.";
 

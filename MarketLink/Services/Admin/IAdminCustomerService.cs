@@ -10,6 +10,6 @@ namespace MarketLink.Services.Admin
         // Each returns false when the customer does not exist
         Task<bool> LockAsync(int userId);
 
-        Task<bool> UnlockAsync(int userId);
+        Task<bool> UnlockAsync(int userId, string loginUrl);
     }
 }
