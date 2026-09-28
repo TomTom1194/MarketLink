@@ -104,6 +104,14 @@ CREATE TABLE Product_Category (
     is_active      BIT NOT NULL DEFAULT 1
 );
 
+-- Which categories a farmer is allowed to sell (ticked on the application form).
+-- A farmer can pick many categories, so this is a link table (many-to-many).
+CREATE TABLE Farmer_Category (
+    farmer_id    INT NOT NULL REFERENCES Farmer_Profile(farmer_id),
+    category_id  INT NOT NULL REFERENCES Product_Category(category_id),
+    PRIMARY KEY (farmer_id, category_id)
+);
+
 -- How long a product stays visible: Short term / Long term
 CREATE TABLE Product_Exp (
     exp_id         INT IDENTITY(1,1) PRIMARY KEY,

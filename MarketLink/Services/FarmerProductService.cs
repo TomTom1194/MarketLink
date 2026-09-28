@@ -31,13 +31,23 @@ namespace MarketLink.Services
             _environment = environment;
         }
 
-        // Load the active categories for the form.
-        public async Task<List<ProductCategory>> GetCategoriesAsync()
+        // Categories this farmer ticked on the application form (only active ones) - used by the product form.
+        // keepCategoryId: the category an existing product already has, so it still shows on the edit form
+        public async Task<List<ProductCategory>> GetCategoriesAsync(int farmerId, int? keepCategoryId = null)
         {
             return await _context.ProductCategories
-                .Where(category => category.IsActive)
+                .Where(category =>
+                    (category.IsActive && _context.FarmerCategories.Any(fc => fc.FarmerId == farmerId && fc.CategoryId == category.CategoryId))
+                    || category.CategoryId == keepCategoryId)
                 .OrderBy(category => category.CategoryName)
                 .ToListAsync();
+        }
+
+        // Is the farmer allowed to post in this category?
+        private Task<bool> FarmerSellsCategoryAsync(int farmerId, int categoryId)
+        {
+            return _context.FarmerCategories.AnyAsync(fc =>
+                fc.FarmerId == farmerId && fc.CategoryId == categoryId && fc.Category!.IsActive);
         }
 
         // The list of units is kept in the Product_Unit table in SQL Server.
@@ -127,6 +137,11 @@ namespace MarketLink.Services
                 throw new InvalidOperationException("The category does not exist or is inactive.");
             }
 
+            if (!await FarmerSellsCategoryAsync(farmerId, model.CategoryId))
+            {
+                throw new InvalidOperationException("You can only post products in the categories you registered for.");
+            }
+
             if (!(await GetUnitsAsync()).Contains(model.Unit.Trim()))
                 throw new InvalidOperationException("The selected unit does not exist or is inactive.");
 
@@ -186,6 +201,12 @@ namespace MarketLink.Services
             if (!categoryExists)
             {
                 throw new InvalidOperationException("The category does not exist or is inactive.");
+            }
+
+            // Changing to another category: it must be one the farmer registered for
+            if (model.CategoryId != product.CategoryId && !await FarmerSellsCategoryAsync(farmerId, model.CategoryId))
+            {
+                throw new InvalidOperationException("You can only post products in the categories you registered for.");
             }
 
             if (!(await GetUnitsAsync()).Contains(model.Unit.Trim()))
@@ -628,7 +649,8 @@ namespace MarketLink.Services
 
             var webRootPath = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
 
-            var uploadFolder = Path.Combine(webRootPath, "uploads", "products");
+            // Saved in wwwroot/images/products (the same folder as the web path returned below)
+            var uploadFolder = Path.Combine(webRootPath, "images", "products");
 
             Directory.CreateDirectory(uploadFolder);
 
@@ -642,7 +664,7 @@ namespace MarketLink.Services
 
             await image.CopyToAsync(fileStream);
 
-            return $"/uploads/products/{fileName}";
+            return $"/images/products/{fileName}";
         }
     }
 }

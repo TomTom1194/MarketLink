@@ -5,7 +5,7 @@ namespace MarketLink.Services
 {
     public interface IFarmerProductService
     {
-        Task<List<ProductCategory>> GetCategoriesAsync();
+        Task<List<ProductCategory>> GetCategoriesAsync(int farmerId, int? keepCategoryId = null);
 
         Task<List<string>> GetUnitsAsync();
 

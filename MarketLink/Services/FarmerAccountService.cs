@@ -91,6 +91,20 @@ namespace MarketLink.Services
             }
 
             // ----- Stall -----
+            // At least one product category, and only categories that exist and are active
+            if (model.CategoryIds.Count == 0)
+            {
+                errors["CategoryIds"] = "Please tick at least one product category you sell.";
+            }
+            else
+            {
+                int validCount = await _context.ProductCategories.CountAsync(c => model.CategoryIds.Contains(c.CategoryId) && c.IsActive);
+                if (validCount != model.CategoryIds.Distinct().Count())
+                {
+                    errors["CategoryIds"] = "One of the chosen categories is no longer available. Please choose again.";
+                }
+            }
+
             if (model.SellingDays.Count == 0)
             {
                 errors["SellingDays"] = "Please tick at least one day you sell.";
@@ -125,6 +139,12 @@ namespace MarketLink.Services
                 Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
                 ApprovalStatus = "pending"
             };
+
+            // Categories the farmer is allowed to sell
+            foreach (int categoryId in model.CategoryIds.Distinct())
+            {
+                farmer.Categories.Add(new FarmerCategory { CategoryId = categoryId });
+            }
             user.FarmerProfile = farmer;
 
             // Existing market, or a new one that stays hidden until the admin approves this farmer
@@ -163,6 +183,14 @@ namespace MarketLink.Services
             _context.Users.Add(user);
             _context.Stalls.Add(stall);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<ProductCategory>> GetActiveCategoriesAsync()
+        {
+            return await _context.ProductCategories
+                .Where(c => c.IsActive)
+                .OrderBy(c => c.CategoryName)
+                .ToListAsync();
         }
 
         public async Task<List<City>> GetCitiesAsync()

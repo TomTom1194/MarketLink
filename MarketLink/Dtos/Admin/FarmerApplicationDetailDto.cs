@@ -14,6 +14,9 @@ namespace MarketLink.Dtos.Admin
         public string DistrictName { get; set; } = "";
         public string CityName { get; set; } = "";
         public string? Description { get; set; }
+
+        // Product categories the farmer ticked on the application form
+        public List<string> CategoryNames { get; set; } = new List<string>();
         public DateTime CreatedAt { get; set; }
 
         // ----- Review -----

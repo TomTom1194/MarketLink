@@ -25,7 +25,7 @@ namespace MarketLink.Models
         [Column("map_url")]
         public string MapUrl { get; set; } = "";
 
-        // Market photo, e.g. /uploads/markets/abc.jpg
+        // Market photo, e.g. /images/markets/abc.jpg
         [StringLength(500)]
         [Column("image_url")]
         public string? ImageUrl { get; set; }

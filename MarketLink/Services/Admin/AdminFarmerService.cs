@@ -108,6 +108,7 @@ namespace MarketLink.Services.Admin
                     DistrictName = f.District!.DistrictName,
                     CityName = f.District.City!.CityName,
                     Description = f.Description,
+                    CategoryNames = f.Categories.Select(fc => fc.Category!.CategoryName).OrderBy(n => n).ToList(),
                     CreatedAt = f.CreatedAt,
                     ApprovalStatus = f.ApprovalStatus,
                     ApprovedAt = f.ApprovedAt,

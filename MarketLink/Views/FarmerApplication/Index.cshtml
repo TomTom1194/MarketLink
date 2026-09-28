@@ -4,6 +4,7 @@
     ViewData["Title"] = "Sell on MarketLink";
 
     var markets = (List<Market>)ViewBag.Markets;
+    var productCategories = (List<ProductCategory>)ViewBag.ProductCategories;
 }
 
 <div class="apply-box">
@@ -66,6 +67,22 @@
                     <label asp-for="Address"></label>
                     <input asp-for="Address" placeholder="Street number, street, ward" />
                     <span asp-validation-for="Address" class="field-error"></span>
+                </div>
+
+                <div class="full">
+                    <span class="day-label">What do you sell? *</span>
+                    <div class="day-picks">
+                        @foreach (var category in productCategories)
+                        {
+                            <label class="day-pick">
+                                <input type="checkbox" name="CategoryIds" value="@category.CategoryId"
+                                       checked="@Model.CategoryIds.Contains(category.CategoryId)" />
+                                <span>@category.CategoryName</span>
+                            </label>
+                        }
+                    </div>
+                    <div class="field-hint">You can only post products in the categories you tick.</div>
+                    <span asp-validation-for="CategoryIds" class="field-error"></span>
                 </div>
 
                 <div class="field full">

@@ -50,6 +50,21 @@
                     }
                 </dd>
 
+                <dt class="col-sm-4">Categories they sell</dt>
+                <dd class="col-sm-8">
+                    @if (Model.CategoryNames.Count == 0)
+                    {
+                        <span class="text-muted">None chosen</span>
+                    }
+                    else
+                    {
+                        @foreach (var name in Model.CategoryNames)
+                        {
+                            <span class="status-pill status-active me-1">@name</span>
+                        }
+                    }
+                </dd>
+
                 <dt class="col-sm-4">Applied on</dt>
                 <dd class="col-sm-8 mb-0">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</dd>
             </dl>
